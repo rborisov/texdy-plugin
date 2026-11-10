@@ -13,7 +13,7 @@ Claude Code gets the full experience through a plugin (MCP server plus a skill t
    git clone https://github.com/rborisov/texdy-plugin.git
    ```
 3. **The portal address.** The base URL of your Texdy including the `/uml` prefix and without a trailing slash, for example `https://your-portal.example.com/uml`. The **API tokens** dialog shows your own address, ready to copy.
-4. **A personal API token.** Open Texdy in the browser, sign in, press **API tokens** in the toolbar, give the token a name (for example `claude on laptop`) and a lifetime, and copy the `umlp_...` value. It is shown only once. Make one token per agent or machine, so you can revoke one without breaking the others.
+4. **A personal API token.** Open Texdy in the browser, sign in, press **API tokens** in the footer (bottom of the page), give the token a name (for example `claude on laptop`) and a lifetime, and copy the `umlp_...` value. It is shown only once. Make one token per agent or machine, so you can revoke one without breaking the others.
 
 The portal must be a version with API tokens (ask whoever runs it to deploy the latest one first).
 
