@@ -1,10 +1,10 @@
 {
-  "name": "uml-portal-marketplace",
+  "name": "texdy-marketplace",
   "description": "Claude Code plugin for Texdy",
   "owner": { "name": "Texdy" },
   "plugins": [
     {
-      "name": "uml-portal",
+      "name": "texdy",
       "source": "./",
       "description": "Draw, change and open UML (PlantUML) diagrams in your Texdy from Claude Code."
     }

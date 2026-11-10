@@ -25,10 +25,10 @@ Add the repository as a marketplace and install the plugin from it:
 
 ```bash
 claude plugin marketplace add rborisov/texdy-plugin
-claude plugin install uml-portal@uml-portal-marketplace
+claude plugin install texdy@texdy-marketplace
 ```
 
-Inside a running session the same commands are `/plugin marketplace add ...` and `/plugin install uml-portal@uml-portal-marketplace`.
+Inside a running session the same commands are `/plugin marketplace add ...` and `/plugin install texdy@texdy-marketplace`.
 
 Claude Code then asks for two values:
 
@@ -41,7 +41,7 @@ Start a **new session** (the MCP server is started when a session starts; `/relo
 
 Ask: *"List my diagrams in Texdy."* Claude should call `list_diagrams` and answer with your diagrams (an empty list is fine for a new account). Then try: *"Draw a sequence diagram of a user logging in."* You should get a saved diagram, a file `diagrams/<slug>.svg` in your project, and the editor opening on it, already signed in.
 
-If Claude does not know about Texdy at all, run `/plugin` and check that `uml-portal` is installed and enabled, then start a new session.
+If Claude does not know about Texdy at all, run `/plugin` and check that `texdy` is installed and enabled, then start a new session.
 
 ### Everyday use
 
@@ -54,7 +54,7 @@ If Claude does not know about Texdy at all, run `/plugin` and check that `uml-po
 ### Change the URL or the token
 
 ```bash
-claude plugin configure uml-portal@uml-portal-marketplace
+claude plugin configure texdy@texdy-marketplace
 ```
 
 shows which values are set; start a new session after changing them.
@@ -62,8 +62,8 @@ shows which values are set; start a new session after changing them.
 ### Update
 
 ```bash
-claude plugin marketplace update uml-portal-marketplace
-claude plugin update uml-portal@uml-portal-marketplace
+claude plugin marketplace update texdy-marketplace
+claude plugin update texdy@texdy-marketplace
 ```
 
 Then start a new session.
@@ -71,7 +71,7 @@ Then start a new session.
 ### Uninstall
 
 ```bash
-claude plugin uninstall uml-portal@uml-portal-marketplace
+claude plugin uninstall texdy@texdy-marketplace
 ```
 
 Revoke the token in Texdy (**API tokens**) if you will not use it again.
@@ -81,7 +81,7 @@ Revoke the token in Texdy (**API tokens**) if you will not use it again.
 If your Claude Code cannot ask for the two values, register only the MCP server by hand (this does not add the skill, so Claude knows the tools but not the workflow; add the rules from [Rules for the agent](#rules-for-the-agent) to your `CLAUDE.md`):
 
 ```bash
-claude mcp add --scope user uml-portal \
+claude mcp add --scope user texdy \
   -e UML_PORTAL_URL=https://d.rclmx.info/uml \
   -e UML_PORTAL_TOKEN=umlp_... \
   -- node /absolute/path/to/texdy-plugin/server/dist/server.mjs
@@ -107,7 +107,7 @@ Use absolute paths; many agents do not start the server in your project folder. 
 ```json
 {
   "mcpServers": {
-    "uml-portal": {
+    "texdy": {
       "command": "node",
       "args": ["/absolute/path/to/texdy-plugin/server/dist/server.mjs"],
       "env": { "UML_PORTAL_URL": "https://d.rclmx.info/uml", "UML_PORTAL_TOKEN": "umlp_..." }
@@ -125,7 +125,7 @@ Use absolute paths; many agents do not start the server in your project folder. 
 ```json
 {
   "servers": {
-    "uml-portal": {
+    "texdy": {
       "type": "stdio",
       "command": "node",
       "args": ["/absolute/path/to/texdy-plugin/server/dist/server.mjs"],
@@ -138,7 +138,7 @@ Use absolute paths; many agents do not start the server in your project folder. 
 **Codex CLI**: `~/.codex/config.toml`:
 
 ```toml
-[mcp_servers.uml-portal]
+[mcp_servers.texdy]
 command = "node"
 args = ["/absolute/path/to/texdy-plugin/server/dist/server.mjs"]
 env = { UML_PORTAL_URL = "https://d.rclmx.info/uml", UML_PORTAL_TOKEN = "umlp_..." }

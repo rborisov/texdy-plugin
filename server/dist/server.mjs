@@ -37103,11 +37103,11 @@ var config2;
 try {
   config2 = validateConfig(process.env);
 } catch (e) {
-  process.stderr.write(`uml-portal MCP server: ${e.message}
+  process.stderr.write(`texdy MCP server: ${e.message}
 `);
   process.exit(1);
 }
-var server = new McpServer({ name: "uml-portal", version: "0.1.0" });
+var server = new McpServer({ name: "texdy", version: "0.1.0" });
 var tools = buildTools(new PortalClient(config2.baseUrl, config2.token));
 for (const [name, def] of Object.entries(tools)) {
   server.registerTool(

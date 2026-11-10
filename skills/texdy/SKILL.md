@@ -1,11 +1,11 @@
 ---
-name: uml-portal
-description: Use when the user asks to draw, create, change, fix or look at a UML or PlantUML diagram (sequence, class, use case, activity, component, state...), or mentions a diagram in their Texdy. Creates and edits diagrams in the portal through the uml-portal MCP tools and opens them in the editor.
+name: texdy
+description: Use when the user asks to draw, create, change, fix or look at a UML or PlantUML diagram (sequence, class, use case, activity, component, state...), or mentions a diagram in their Texdy. Creates and edits diagrams in the portal through the texdy MCP tools and opens them in the editor.
 ---
 
 # Texdy
 
-Diagrams live in the user's Texdy. Use the `uml-portal` MCP tools: `render_diagram`, `create_diagram`, `get_diagram`, `update_diagram`, `list_diagrams`, `open_diagram`, `export_diagram`.
+Diagrams live in the user's Texdy. Use the `texdy` MCP tools: `render_diagram`, `create_diagram`, `get_diagram`, `update_diagram`, `list_diagrams`, `open_diagram`, `export_diagram`.
 
 ## New diagram
 

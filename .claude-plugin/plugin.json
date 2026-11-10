@@ -1,5 +1,5 @@
 {
-  "name": "uml-portal",
+  "name": "texdy",
   "version": "0.1.0",
   "description": "Draw, change and open UML (PlantUML) diagrams in your Texdy from Claude Code.",
   "author": { "name": "Roman Borisov" },
