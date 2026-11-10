@@ -1,0 +1,20 @@
+{
+  "name": "uml-portal",
+  "version": "0.1.0",
+  "description": "Draw, change and open UML (PlantUML) diagrams in your Texdy from Claude Code.",
+  "author": { "name": "Roman Borisov" },
+  "userConfig": {
+    "portal_url": {
+      "type": "string",
+      "title": "Portal URL",
+      "description": "Base URL of your Texdy, e.g. https://host/uml (no trailing slash)",
+      "default": ""
+    },
+    "api_token": {
+      "type": "string",
+      "title": "API token",
+      "description": "Personal API token (umlp_...) from the portal toolbar, \"API tokens\"",
+      "sensitive": true
+    }
+  }
+}

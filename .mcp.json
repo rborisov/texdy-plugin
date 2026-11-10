@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "uml-portal": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server/dist/server.mjs"],
+      "env": {
+        "UML_PORTAL_URL": "${user_config.portal_url}",
+        "UML_PORTAL_TOKEN": "${user_config.api_token}"
+      }
+    }
+  }
+}
