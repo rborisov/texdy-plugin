@@ -12,7 +12,7 @@ Claude Code gets the full experience through a plugin (MCP server plus a skill t
    ```bash
    git clone https://github.com/rborisov/texdy-plugin.git
    ```
-3. **The portal address.** The base URL of your Texdy including the `/uml` prefix and without a trailing slash, for example `https://d.rclmx.info/uml`.
+3. **The portal address.** The base URL of your Texdy including the `/uml` prefix and without a trailing slash, for example `https://your-portal.example.com/uml`. The **API tokens** dialog shows your own address, ready to copy.
 4. **A personal API token.** Open Texdy in the browser, sign in, press **API tokens** in the toolbar, give the token a name (for example `claude on laptop`) and a lifetime, and copy the `umlp_...` value. It is shown only once. Make one token per agent or machine, so you can revoke one without breaking the others.
 
 The portal must be a version with API tokens (ask whoever runs it to deploy the latest one first).
@@ -82,7 +82,7 @@ If your Claude Code cannot ask for the two values, register only the MCP server 
 
 ```bash
 claude mcp add --scope user texdy \
-  -e UML_PORTAL_URL=https://d.rclmx.info/uml \
+  -e UML_PORTAL_URL=https://your-portal.example.com/uml \
   -e UML_PORTAL_TOKEN=umlp_... \
   -- node /absolute/path/to/texdy-plugin/server/dist/server.mjs
 ```
@@ -97,7 +97,7 @@ Any agent that can start a **stdio MCP server** works. The server is always the 
 |---|---|
 | command | `node` |
 | arguments | `/absolute/path/to/texdy-plugin/server/dist/server.mjs` |
-| env `UML_PORTAL_URL` | `https://d.rclmx.info/uml` (your portal, no trailing slash) |
+| env `UML_PORTAL_URL` | `https://your-portal.example.com/uml` (your portal, no trailing slash) |
 | env `UML_PORTAL_TOKEN` | `umlp_...` |
 
 Use absolute paths; many agents do not start the server in your project folder. Put the settings where your agent keeps its MCP servers. The usual places (check your agent's documentation if it changed):
@@ -110,7 +110,7 @@ Use absolute paths; many agents do not start the server in your project folder. 
     "texdy": {
       "command": "node",
       "args": ["/absolute/path/to/texdy-plugin/server/dist/server.mjs"],
-      "env": { "UML_PORTAL_URL": "https://d.rclmx.info/uml", "UML_PORTAL_TOKEN": "umlp_..." }
+      "env": { "UML_PORTAL_URL": "https://your-portal.example.com/uml", "UML_PORTAL_TOKEN": "umlp_..." }
     }
   }
 }
@@ -129,7 +129,7 @@ Use absolute paths; many agents do not start the server in your project folder. 
       "type": "stdio",
       "command": "node",
       "args": ["/absolute/path/to/texdy-plugin/server/dist/server.mjs"],
-      "env": { "UML_PORTAL_URL": "https://d.rclmx.info/uml", "UML_PORTAL_TOKEN": "umlp_..." }
+      "env": { "UML_PORTAL_URL": "https://your-portal.example.com/uml", "UML_PORTAL_TOKEN": "umlp_..." }
     }
   }
 }
@@ -141,7 +141,7 @@ Use absolute paths; many agents do not start the server in your project folder. 
 [mcp_servers.texdy]
 command = "node"
 args = ["/absolute/path/to/texdy-plugin/server/dist/server.mjs"]
-env = { UML_PORTAL_URL = "https://d.rclmx.info/uml", UML_PORTAL_TOKEN = "umlp_..." }
+env = { UML_PORTAL_URL = "https://your-portal.example.com/uml", UML_PORTAL_TOKEN = "umlp_..." }
 ```
 
 Restart the agent after saving. These files hold the token in plain text: do not commit a project-level file that contains it (put the file in `.gitignore`, or use the user-level file).
