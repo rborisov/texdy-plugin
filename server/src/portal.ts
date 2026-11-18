@@ -138,6 +138,21 @@ export class PortalClient {
     this.timeoutMs = opts.timeoutMs ?? 10_000;
   }
 
+  /** The configured portal address (no trailing slash): the only site an address handed to focus_diagram may be of. */
+  baseUrlForRefs(): string {
+    return this.baseUrl;
+  }
+
+  // Follows a share link as the user: the portal makes (or finds) the user's own copy and says which diagram it is. The
+  // share token travels in the body, never in the path, and is not kept.
+  async openShare(token: string): Promise<{ slug: string; title: string; own: boolean }> {
+    const j = await this.request("POST", "/api/shares/open", { token });
+    if (typeof j.copy !== "string" || !/^[0-9a-f]{12}$/.test(j.copy)) {
+      throw new PortalError("Portal answered with an unexpected share result (no copy of the diagram)", 200);
+    }
+    return { slug: j.copy, title: String(j.title ?? ""), own: j.own === true };
+  }
+
   urlFor(slug: string): string {
     return `${this.baseUrl}/?d=${encodeURIComponent(slug)}`;
   }

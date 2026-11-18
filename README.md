@@ -49,6 +49,7 @@ If Claude does not know about Mimosoid at all, run `/plugin` and check that `mim
 - **Edit in the editor:** change the diagram in Mimosoid as usual. It saves by itself.
 - **Hand the changes back:** tell Claude *"review my changes"* (or "I changed the diagram, update the SVG"). The portal does not notify the agent, so it only looks when you ask. Claude reads the current source, refreshes the exported file and reviews what you changed.
 - **Change it with Claude:** "Add a cache between the API and the database." Claude always reads the current version first and never overwrites your edits; if you both changed it, it merges.
+- **Work on one diagram:** once Claude has created a diagram, or you give it one, the conversation keeps working on that diagram: edits, restyling and reviews go to it, and Claude does not create a second one unless you ask for a separate diagram. Give it a diagram by pasting its address from the portal (`…/?d=<slug>`), a share link (Claude then works on your own copy; the original is not changed), or the path of an image the portal exported with its source (an SVG or PNG saved with Embed source, such as the files Claude exports into `diagrams/`). A picture pasted into the chat carries no diagram id, so Claude asks for the file, the address or the slug.
 - **Open an existing diagram:** "Open the diagram 'login flow'." The link Claude uses signs the editor in with your token and works once, for about a minute.
 
 ### Change the URL or the token
@@ -163,13 +164,15 @@ Other agents have no skill, so tell them the workflow once, in the file they rea
 | Tool | What it does |
 |---|---|
 | `render_diagram` | Checks PlantUML without saving; returns the picture, or errors with line numbers |
-| `create_diagram` | Saves a new diagram; returns slug, version and link. Optional `chosen_type` sets the type you want the editor's tools to follow |
+| `create_diagram` | Saves a new diagram, which becomes the one being worked on (it refuses to make another until you ask for one); returns slug, version and link. Optional `chosen_type` sets the type you want the editor's tools to follow |
 | `get_diagram` | Returns title, type, chosen type (when set), version, link and source |
 | `update_diagram` | Replaces the source (and optionally the title or `chosen_type`; `auto` clears it); needs `base_version`, refuses to overwrite someone else's change |
 | `list_diagrams` | Lists your diagrams |
 | `open_diagram` | A one-time link that opens the editor signed in |
 | `export_diagram` | Saves an SVG (or PNG) into the project folder with the diagram's source, slug and version embedded in the file |
 | `show_diagram` | Shows the saved diagram's current picture: the agent gets the picture and an image link (it works for about 15 minutes and nothing is published). In the Claude desktop app the link opens in the side panel; elsewhere the reply carries the picture as a link the chat shows after you click "Show image" |
+| `focus_diagram` | Makes a diagram the one the conversation works on: give it a slug, the diagram's address in the portal, a share link (you get your own copy), or an exported SVG/PNG file from the project folder |
+| `current_diagram` | Says which diagram is being worked on |
 
 An exported SVG or PNG carries its own source, so you can open it, see which diagram and version it came from, and recover the source from it.
 

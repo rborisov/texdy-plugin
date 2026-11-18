@@ -5,7 +5,17 @@ description: Use when the user asks to draw, create, change, fix or look at a UM
 
 # Mimosoid
 
-Diagrams live in the user's Mimosoid. Use the `mimosoid` MCP tools: `render_diagram`, `create_diagram`, `get_diagram`, `update_diagram`, `list_diagrams`, `open_diagram`, `export_diagram`, `show_diagram`.
+Diagrams live in the user's Mimosoid. Use the `mimosoid` MCP tools: `render_diagram`, `create_diagram`, `get_diagram`, `update_diagram`, `list_diagrams`, `open_diagram`, `export_diagram`, `show_diagram`, `focus_diagram`, `current_diagram`.
+
+## Work on one diagram
+
+A conversation works on one diagram at a time, and the plugin remembers which: the one **in focus**.
+
+- **Before you do anything with a diagram** (draw, change, restyle, review, show), call `current_diagram`. If a diagram is in focus, that is the one: change it, do not create another. This is also how you find it again after a long conversation.
+- **When the user gives you a diagram,** call `focus_diagram` with what they gave: its slug, its address in the portal (`…/?d=<slug>`), a share link (`…/#share=…`), or the path of an image the portal exported (an SVG or PNG saved with its source, in the project folder). A share link gives the user their own copy: tell them that changes to it do not reach the original. If they paste SVG text, take the `slug="…"` from its `<source>` element and pass that. If they paste a picture into the chat, you cannot read an id from it (it reaches you as pixels): say so and ask for the file, the address or the slug. You may suggest a diagram whose title you can read in the picture, from `list_diagrams`, as a question, never as a guess you act on.
+- **Creating:** `create_diagram` makes the new diagram the one in focus and refuses while another is in focus. Pass `another: true` only when the user asked for a separate, new diagram.
+- **Changing the look** (colours, fonts, line styles) means editing the diagram's own `<style>` block in its source: keep the rest of the source as it is, `render_diagram` it before you save, then `update_diagram`.
+- **Reviewing** the user's edits means `get_diagram`: when the diagram changed since you last read it, the result says what changed (a diff) before the source. Read that, not only the new source.
 
 ## New diagram
 
@@ -35,7 +45,7 @@ If `show_diagram` says no image link could be made (an older portal, or too many
 
 The user may have edited it in the editor since you last saw it, so never update from memory.
 
-1. If you do not know the slug, call `list_diagrams`.
+1. If you do not know which diagram, call `current_diagram`; with none in focus, call `list_diagrams` and ask, or `focus_diagram` with what the user gave you. Once a diagram is in focus the tools need no slug.
 2. Call `get_diagram` first and base your change on the source it returns. It shows `type` (what PlantUML recognized) and, when one is set, `chosen type`. Keep the chosen type unless the user asks to change it; if the two are of different kinds (not just use case / component, or class / object), the text does not match what the user chose: tell them instead of silently changing either.
 3. Optionally `render_diagram` the new source to check it.
 4. Call `update_diagram` with the full new source and the `version` you just read as `base_version`. When it succeeds, call `export_diagram` again to refresh the file.

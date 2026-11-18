@@ -138,11 +138,11 @@ test("show_diagram will not put a huge picture in the chat: it says to export it
   assert.match(text(res), /export_diagram/);
 });
 
-test("show_diagram takes only a well-formed slug", () => {
+test("show_diagram takes a well-formed slug, or none (then the diagram in focus)", () => {
   const tools = buildTools(new PortalClient("http://127.0.0.1:1", TOKEN));
   const schema = z.object(tools.show_diagram.inputSchema);
   assert.ok(schema.safeParse({ slug: SLUG }).success);
   assert.ok(!schema.safeParse({ slug: "../x" }).success);
-  assert.ok(!schema.safeParse({}).success);
+  assert.ok(schema.safeParse({}).success);
   assert.deepEqual(Object.keys(tools.show_diagram.inputSchema), ["slug"]);
 });

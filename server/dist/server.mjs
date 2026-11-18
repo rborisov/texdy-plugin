@@ -2897,9 +2897,9 @@ var require_compile = __commonJS({
       if (_sch)
         return _sch;
       const rootId = (0, resolve_1.getFullPath)(this.opts.uriResolver, sch.root.baseId);
-      const { es5, lines } = this.opts.code;
+      const { es5, lines: lines2 } = this.opts.code;
       const { ownProperties } = this.opts;
-      const gen = new codegen_1.CodeGen(this.scope, { es5, lines, ownProperties });
+      const gen = new codegen_1.CodeGen(this.scope, { es5, lines: lines2, ownProperties });
       let _ValidationError;
       if (sch.$async) {
         _ValidationError = gen.scopeValue("Error", {
@@ -4406,8 +4406,8 @@ var require_core = __commonJS({
         this._loading = {};
         this._cache = /* @__PURE__ */ new Map();
         opts = this.opts = { ...opts, ...requiredOptions(opts) };
-        const { es5, lines } = this.opts.code;
-        this.scope = new codegen_2.ValueScope({ scope: {}, prefixes: EXT_SCOPE_NAMES, es5, lines });
+        const { es5, lines: lines2 } = this.opts.code;
+        this.scope = new codegen_2.ValueScope({ scope: {}, prefixes: EXT_SCOPE_NAMES, es5, lines: lines2 });
         this.logger = getLogger(opts.logger);
         const formatOpt = opts.validateFormats;
         opts.validateFormats = false;
@@ -5110,8 +5110,8 @@ var require_multipleOf = __commonJS({
         const { gen, data, schemaCode, it } = cxt;
         const prec = it.opts.multipleOfPrecision;
         const res = gen.let("res");
-        const invalid = prec ? (0, codegen_1._)`Math.abs(Math.round(${res}) - ${res}) > 1e-${prec}` : (0, codegen_1._)`${res} !== parseInt(${res})`;
-        cxt.fail$data((0, codegen_1._)`(${schemaCode} === 0 || (${res} = ${data}/${schemaCode}, ${invalid}))`);
+        const invalid2 = prec ? (0, codegen_1._)`Math.abs(Math.round(${res}) - ${res}) > 1e-${prec}` : (0, codegen_1._)`${res} !== parseInt(${res})`;
+        cxt.fail$data((0, codegen_1._)`(${schemaCode} === 0 || (${res} = ${data}/${schemaCode}, ${invalid2}))`);
       }
     };
     exports.default = def;
@@ -12627,14 +12627,14 @@ function toDotPath(_path) {
   return segs.join("");
 }
 function prettifyError(error62) {
-  const lines = [];
+  const lines2 = [];
   const issues = [...error62.issues].sort((a, b) => (a.path ?? []).length - (b.path ?? []).length);
   for (const issue2 of issues) {
-    lines.push(`\u2716 ${issue2.message}`);
+    lines2.push(`\u2716 ${issue2.message}`);
     if (issue2.path?.length)
-      lines.push(`  \u2192 at ${toDotPath(issue2.path)}`);
+      lines2.push(`  \u2192 at ${toDotPath(issue2.path)}`);
   }
-  return lines.join("\n");
+  return lines2.join("\n");
 }
 
 // node_modules/zod/v4/core/parse.js
@@ -13469,9 +13469,9 @@ var Doc = class {
       return;
     }
     const content = arg;
-    const lines = content.split("\n").filter((x) => x);
-    const minIndent = Math.min(...lines.map((x) => x.length - x.trimStart().length));
-    const dedented = lines.map((x) => x.slice(minIndent)).map((x) => " ".repeat(this.indent * 2) + x);
+    const lines2 = content.split("\n").filter((x) => x);
+    const minIndent = Math.min(...lines2.map((x) => x.length - x.trimStart().length));
+    const dedented = lines2.map((x) => x.slice(minIndent)).map((x) => " ".repeat(this.indent * 2) + x);
     for (const line of dedented) {
       this.content.push(line);
     }
@@ -36715,6 +36715,19 @@ var PortalClient = class {
     this.fetchImpl = fetchImpl;
     this.timeoutMs = opts.timeoutMs ?? 1e4;
   }
+  /** The configured portal address (no trailing slash): the only site an address handed to focus_diagram may be of. */
+  baseUrlForRefs() {
+    return this.baseUrl;
+  }
+  // Follows a share link as the user: the portal makes (or finds) the user's own copy and says which diagram it is. The
+  // share token travels in the body, never in the path, and is not kept.
+  async openShare(token) {
+    const j = await this.request("POST", "/api/shares/open", { token });
+    if (typeof j.copy !== "string" || !/^[0-9a-f]{12}$/.test(j.copy)) {
+      throw new PortalError("Portal answered with an unexpected share result (no copy of the diagram)", 200);
+    }
+    return { slug: j.copy, title: String(j.title ?? ""), own: j.own === true };
+  }
   urlFor(slug2) {
     return `${this.baseUrl}/?d=${encodeURIComponent(slug2)}`;
   }
@@ -36959,12 +36972,192 @@ async function writeExport(root, requested, slug2, format, bytes) {
   }
   return { ...plan, bytes: bytes.length };
 }
+var MAX_READ_BYTES = 20 * 1024 * 1024;
+async function readProjectFile(root, requested) {
+  const refuse = (why) => new PortalError(`Cannot read that file: ${why}`, 0);
+  if (!requested || requested.includes("\0")) throw refuse("the path is not usable");
+  const ext = path.extname(requested).toLowerCase();
+  if (ext !== ".svg" && ext !== ".png") throw refuse("only .svg and .png images are read");
+  const abs = path.resolve(root, requested);
+  const rel = path.relative(root, abs);
+  if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) throw refuse("the file must be inside the project folder");
+  let cur = root;
+  const parts = rel.split(path.sep);
+  for (const [i, part] of parts.entries()) {
+    cur = path.join(cur, part);
+    const st = await fs.lstat(cur).catch(() => null);
+    if (!st) throw refuse("there is no such file");
+    if (st.isSymbolicLink()) throw refuse(`"${part}" is a symbolic link`);
+    const last = i === parts.length - 1;
+    if (last ? !st.isFile() : !st.isDirectory()) throw refuse(last ? "it is not a file" : `"${part}" is not a folder`);
+    if (last && st.size > MAX_READ_BYTES) throw refuse("the file is too large (over 20 MB)");
+  }
+  try {
+    return await fs.readFile(cur);
+  } catch {
+    throw refuse("it could not be read");
+  }
+}
+
+// src/diff.ts
+var CONTEXT = 2;
+var MAX_CELLS = 4e6;
+var lines = (text) => text === "" ? [] : text.replace(/\r\n?/g, "\n").split("\n");
+var tooLong = (maxLines) => `(the change is longer than ${maxLines} lines; read the new source)`;
+function lineDiff(oldText, newText, maxLines = 200) {
+  const a = lines(oldText);
+  const b = lines(newText);
+  if (a.length === b.length && a.every((l, i2) => l === b[i2])) return null;
+  let head = 0;
+  while (head < a.length && head < b.length && a[head] === b[head]) head++;
+  let tail = 0;
+  while (tail < a.length - head && tail < b.length - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
+  const x = a.slice(head, a.length - tail);
+  const y = b.slice(head, b.length - tail);
+  if (x.length * y.length > MAX_CELLS) return tooLong(maxLines);
+  const w = y.length + 1;
+  const table = new Int32Array((x.length + 1) * w);
+  for (let i2 = x.length - 1; i2 >= 0; i2--) {
+    for (let j2 = y.length - 1; j2 >= 0; j2--) {
+      table[i2 * w + j2] = x[i2] === y[j2] ? table[(i2 + 1) * w + j2 + 1] + 1 : Math.max(table[(i2 + 1) * w + j2], table[i2 * w + j2 + 1]);
+    }
+  }
+  const ops = a.slice(0, head).map((s) => ({ t: " ", s }));
+  let i = 0;
+  let j = 0;
+  while (i < x.length || j < y.length) {
+    if (i < x.length && j < y.length && x[i] === y[j]) ops.push({ t: " ", s: x[i++] }), j++;
+    else if (i < x.length && (j === y.length || table[(i + 1) * w + j] >= table[i * w + j + 1])) ops.push({ t: "-", s: x[i++] });
+    else ops.push({ t: "+", s: y[j++] });
+  }
+  for (const s of a.slice(a.length - tail)) ops.push({ t: " ", s });
+  if (ops.filter((o) => o.t !== " ").length > maxLines) return tooLong(maxLines);
+  const keep = ops.map(() => false);
+  ops.forEach((o, k) => {
+    if (o.t === " ") return;
+    for (let c = Math.max(0, k - CONTEXT); c <= Math.min(ops.length - 1, k + CONTEXT); c++) keep[c] = true;
+  });
+  const out = [];
+  ops.forEach((o, k) => {
+    if (keep[k]) out.push(`${o.t} ${o.s}`);
+    else if (k > 0 && keep[k - 1] && keep.slice(k).some(Boolean)) out.push("  ...");
+  });
+  return out.join("\n");
+}
+
+// src/focus.ts
+var MAX_REMEMBERED = 20;
+var MAX_SOURCE_BYTES = 200 * 1024;
+var Focus = class {
+  focused = null;
+  // insertion order is age: the first key is the oldest
+  seen = /* @__PURE__ */ new Map();
+  get() {
+    return this.focused;
+  }
+  set(d) {
+    this.focused = { slug: d.slug, title: d.title, version: d.version };
+  }
+  clear() {
+    this.focused = null;
+  }
+  /** Remember the source that was just shown (a source over 200 KB is not kept, and replaces an older one). */
+  saw(slug2, version2, source) {
+    this.seen.delete(slug2);
+    if (Buffer.byteLength(source) > MAX_SOURCE_BYTES) return;
+    this.seen.set(slug2, { version: version2, source });
+    while (this.seen.size > MAX_REMEMBERED) this.seen.delete(this.seen.keys().next().value);
+  }
+  /** What changed since the last time this diagram was shown, when a higher version now has a different source. */
+  changeSince(slug2, version2, source) {
+    const before = this.seen.get(slug2);
+    if (!before || version2 <= before.version) return null;
+    const diff = lineDiff(before.source, source);
+    return diff === null ? null : { fromVersion: before.version, diff };
+  }
+};
+
+// src/image.ts
+var SLUG = /^[0-9a-f]{12}$/;
+var NAMESPACE = "urn:uml-portal:source:1";
+var PNG_SIGNATURE2 = [137, 80, 78, 71, 13, 10, 26, 10];
+var identity = (slug2, version2) => {
+  if (!slug2 || !SLUG.test(slug2)) return null;
+  return version2 && /^\d{1,9}$/.test(version2) ? { slug: slug2, version: Number(version2) } : { slug: slug2 };
+};
+function fromPng(b) {
+  const text = /* @__PURE__ */ new Map();
+  let at = PNG_SIGNATURE2.length;
+  while (at + 8 <= b.length) {
+    const len = (b[at] << 24 | b[at + 1] << 16 | b[at + 2] << 8 | b[at + 3]) >>> 0;
+    const type = String.fromCharCode(b[at + 4], b[at + 5], b[at + 6], b[at + 7]);
+    const start = at + 8;
+    if (start + len + 4 > b.length) break;
+    if (type === "iTXt") {
+      const data = b.subarray(start, start + len);
+      const k = data.indexOf(0);
+      if (k > 0 && data[k + 1] === 0) {
+        let p = k + 3;
+        for (let zeros = 0; zeros < 2 && p < data.length; p++) if (data[p] === 0) zeros++;
+        text.set(Buffer.from(data.subarray(0, k)).toString("latin1"), Buffer.from(data.subarray(p)).toString("utf8"));
+      }
+    }
+    if (type === "IEND") break;
+    at = start + len + 4;
+  }
+  return identity(text.get("uml-portal-slug"), text.get("uml-portal-version"));
+}
+function fromSvg(b) {
+  const head = Buffer.from(b.subarray(0, 4 * 1024 * 1024)).toString("utf8");
+  if (!head.includes(NAMESPACE)) return null;
+  for (const m of head.matchAll(/<source\b([^>]*)>/g)) {
+    const attrs = m[1];
+    if (!attrs.includes(`xmlns="${NAMESPACE}"`)) continue;
+    return identity(/\bslug="([^"]*)"/.exec(attrs)?.[1], /\bversion="([^"]*)"/.exec(attrs)?.[1]);
+  }
+  return null;
+}
+function readImageIdentity(bytes) {
+  if (bytes.length >= PNG_SIGNATURE2.length && PNG_SIGNATURE2.every((v, i) => bytes[i] === v)) return fromPng(bytes);
+  return fromSvg(bytes);
+}
+
+// src/ref.ts
+var SLUG2 = /^[0-9a-f]{12}$/;
+var SHARE_TOKEN = /^[A-Za-z0-9_-]{16,64}$/;
+var SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+var invalid = (why) => ({ kind: "invalid", why });
+function parseRef(ref, portalBase) {
+  const text = ref.trim();
+  if (!text) return invalid("nothing was given: pass a slug, the diagram's address in the portal, a share link, or the path of an exported image");
+  if (text.includes("\0")) return invalid("that is not a usable path");
+  if (SLUG2.test(text)) return { kind: "slug", slug: text };
+  if (!SCHEME.test(text) || /^[A-Za-z]:[\\/]/.test(text)) return { kind: "file", path: text };
+  let url2;
+  let base;
+  try {
+    url2 = new URL(text);
+    base = new URL(portalBase);
+  } catch {
+    return invalid("that address could not be read");
+  }
+  if (url2.protocol !== "http:" && url2.protocol !== "https:") return invalid("only http and https addresses of this portal are used");
+  if (url2.origin !== base.origin) return invalid("that address is not this portal, so it is not used");
+  const prefix = base.pathname.replace(/\/+$/, "");
+  if (prefix && url2.pathname !== prefix && !url2.pathname.startsWith(prefix + "/")) return invalid("that address is not in this portal's path, so it is not used");
+  const share = /^#share=(.*)$/.exec(url2.hash);
+  if (share && SHARE_TOKEN.test(share[1])) return { kind: "share", token: share[1] };
+  const d = url2.searchParams.get("d");
+  if (d && SLUG2.test(d)) return { kind: "editor", slug: d };
+  return invalid("that address names no diagram (it needs ?d=<slug> or a #share=\u2026 link)");
+}
 
 // src/tools.ts
 var MAX_SHOW_BYTES = 4 * 1024 * 1024;
 var ok = (text) => ({ content: [{ type: "text", text }] });
 var fail = (text) => ({ content: [{ type: "text", text }], isError: true });
 var slug = external_exports.string().regex(/^[0-9a-f]{12}$/, "slug must be 12 lowercase hex characters (the id in the ?d=<slug> link)").describe("Diagram slug: 12 lowercase hex characters (the id in the ?d=<slug> link)");
+var optionalSlug = external_exports.string().regex(/^[0-9a-f]{12}$/, "slug must be 12 lowercase hex characters (the id in the ?d=<slug> link)").optional().describe("Diagram slug: 12 lowercase hex characters (the id in the ?d=<slug> link). Optional: the diagram in focus when omitted.");
 var errorLines = (errors) => "Errors:\n" + errors.map(
   (e) => [
     `- ${e.line ? `line ${e.line}: ` : ""}${e.message}`,
@@ -37031,6 +37224,43 @@ To show it in the chat, put this in your reply: ![Diagram ${slug2}](${l.url})`;
   }
 }
 function buildTools(client, opts = {}) {
+  const focus = new Focus();
+  async function onDiagram(given, run) {
+    const f = focus.get();
+    const slug2 = given ?? f?.slug;
+    if (!slug2) {
+      return fail("No diagram in focus: pass a slug, or call focus_diagram first (with the diagram's address in the portal, a share link, or an exported image).");
+    }
+    const note = given && f && f.slug !== given ? `
+(not the focused diagram: "${f.title}" (${f.slug}) is in focus)` : "";
+    try {
+      return await run(slug2, note);
+    } catch (e) {
+      if (e instanceof PortalError && (e.status === 404 || e.status === 403) && f && f.slug === slug2) focus.clear();
+      throw e;
+    }
+  }
+  function remember(d) {
+    const change = focus.changeSince(d.slug, d.version, d.source);
+    focus.saw(d.slug, d.version, d.source);
+    if (focus.get()?.slug === d.slug) focus.set(d);
+    return change;
+  }
+  const describe3 = (d, change) => {
+    const type = (d.diagramType ? `type: ${d.diagramType}
+` : "") + (d.chosenType ? `chosen type: ${d.chosenType}
+` : "");
+    const changed = change ? `
+Changed since you last saw it (v${change.fromVersion} to v${d.version}):
+${change.diff}
+` : "";
+    return `title: ${d.title}
+${type}version: ${d.version}
+url: ${d.url}
+${changed}
+source:
+${d.source}`;
+  };
   return {
     render_diagram: {
       description: "Render PlantUML source to a PNG image without saving anything. Returns the image, or syntax errors with line numbers.",
@@ -37058,72 +37288,80 @@ function buildTools(client, opts = {}) {
       inputSchema: {
         title: external_exports.string().min(1).describe("Diagram title"),
         source: external_exports.string().min(1).describe("PlantUML source"),
-        chosen_type: chosenType
+        chosen_type: chosenType,
+        another: external_exports.boolean().optional().describe("Only when the user asked for a separate, new diagram while another is in focus. Without it, create_diagram refuses while a diagram is in focus: update that one.")
       },
-      handler: ({ title, source, chosen_type }) => guard(async () => {
+      handler: ({ title, source, chosen_type, another }) => guard(async () => {
+        const f = focus.get();
+        if (f && !another) {
+          return fail(
+            `Diagram "${f.title}" (${f.slug}) is in focus: use update_diagram on it (read it with get_diagram first). If the user asked for a separate, new diagram, call create_diagram again with another: true.`
+          );
+        }
         const d = await client.create(title, source, portalChosen(chosen_type));
+        focus.set(d);
+        focus.saw(d.slug, d.version, source);
         const chosen = d.chosenType ? `, chosen type: ${d.chosenType}` : "";
         return ok(
-          `Created diagram "${d.title}" (slug ${d.slug}, version ${d.version}${chosen}).
+          `Created diagram "${d.title}" (slug ${d.slug}, version ${d.version}${chosen}). It is now the diagram in focus.
 Open in the editor: ${d.url}`
         );
       })
     },
     get_diagram: {
-      description: "Read a diagram's current source, title, type and version. 'type' is what PlantUML recognized in the source; 'chosen type' (shown only when one is set) is what was chosen for the diagram. Use its version as base_version when updating.",
-      inputSchema: { slug },
-      handler: ({ slug: slug2 }) => guard(async () => {
-        const d = await client.get(slug2);
-        const type = (d.diagramType ? `type: ${d.diagramType}
-` : "") + (d.chosenType ? `chosen type: ${d.chosenType}
-` : "");
-        return ok(`title: ${d.title}
-${type}version: ${d.version}
-url: ${d.url}
-
-source:
-${d.source}`);
-      })
+      description: "Read a diagram's current source, title, type and version (the diagram in focus when no slug is given). 'type' is what PlantUML recognized in the source; 'chosen type' (shown only when one is set) is what was chosen for the diagram. When the diagram changed since you last read it, the result says what changed (a diff): that is how to review the user's edits. Use its version as base_version when updating.",
+      inputSchema: { slug: optionalSlug },
+      handler: ({ slug: given }) => guard(
+        () => onDiagram(given, async (slug2, note) => {
+          const d = await client.get(slug2);
+          const change = remember(d);
+          return ok(describe3(d, change) + note);
+        })
+      )
     },
     update_diagram: {
-      description: "Update a diagram's source (and optionally its title or chosen type). base_version is required: pass the version you last read. If the diagram changed elsewhere, you get the current version and source back to merge.",
+      description: "Update a diagram's source (and optionally its title or chosen type); the diagram in focus when no slug is given. base_version is required: pass the version you last read. If the diagram changed elsewhere, you get the current version and source back to merge.",
       inputSchema: {
-        slug,
+        slug: optionalSlug,
         source: external_exports.string().min(1).describe("Full new PlantUML source"),
         base_version: external_exports.number().int().min(1).describe("The version you based this edit on (a positive integer)"),
         title: external_exports.string().min(1).optional(),
         chosen_type: chosenType
       },
-      handler: ({ slug: slug2, source, base_version, title, chosen_type }) => guard(async () => {
-        try {
-          const d = await client.update(slug2, {
-            source,
-            baseVersion: base_version,
-            title,
-            chosenType: portalChosen(chosen_type)
-          });
-          return ok(`Updated diagram ${d.slug} to version ${d.version}.
-Open in the editor: ${d.url}`);
-        } catch (e) {
-          if (!(e instanceof PortalError) || e.status !== 409) throw e;
-          const body = e.body;
-          let current_version = typeof body?.current_version === "number" ? body.current_version : void 0;
-          let sourceText = "";
+      handler: ({ slug: given, source, base_version, title, chosen_type }) => guard(
+        () => onDiagram(given, async (slug2, note) => {
           try {
-            const cur = await client.get(slug2);
-            current_version = cur.version;
-            sourceText = `
+            const d = await client.update(slug2, {
+              source,
+              baseVersion: base_version,
+              title,
+              chosenType: portalChosen(chosen_type)
+            });
+            focus.saw(d.slug, d.version, source);
+            if (focus.get()?.slug === d.slug) focus.set(d);
+            return ok(`Updated diagram ${d.slug} to version ${d.version}.
+Open in the editor: ${d.url}${note}`);
+          } catch (e) {
+            if (!(e instanceof PortalError) || e.status !== 409) throw e;
+            const body = e.body;
+            let current_version = typeof body?.current_version === "number" ? body.current_version : void 0;
+            let sourceText = "";
+            try {
+              const cur = await client.get(slug2);
+              current_version = cur.version;
+              sourceText = `
 
 current source:
 ${cur.source}`;
-          } catch {
-            sourceText = "\n\n(could not fetch the current source; call get_diagram)";
+            } catch {
+              sourceText = "\n\n(could not fetch the current source; call get_diagram)";
+            }
+            return fail(
+              `Conflict: the diagram changed elsewhere. Your base_version was ${base_version}; current_version: ${current_version ?? "unknown"}. Merge your changes into the current source and call update_diagram again with base_version ${current_version ?? "<current_version>"}.` + sourceText
+            );
           }
-          return fail(
-            `Conflict: the diagram changed elsewhere. Your base_version was ${base_version}; current_version: ${current_version ?? "unknown"}. Merge your changes into the current source and call update_diagram again with base_version ${current_version ?? "<current_version>"}.` + sourceText
-          );
-        }
-      })
+        })
+      )
     },
     list_diagrams: {
       description: "List your diagrams (slug, title, type, chosen type when set as chosen:<type>, version, editor link). Source is not included; use get_diagram.",
@@ -37140,72 +37378,146 @@ ${cur.source}`;
     },
     open_diagram: {
       description: "Get a link that opens the diagram in the portal editor already signed in. The link works once and only for about a minute, so give it to the user right away and do not store or share it. For a link to share or print, use the plain link from create_diagram or get_diagram instead.",
-      inputSchema: { slug },
-      handler: ({ slug: slug2 }) => guard(async () => {
-        let code;
-        try {
-          code = await client.createLinkCode();
-        } catch (e) {
-          if (e instanceof PortalError && e.status === 429) {
-            return fail("Portal answered 429: too many unopened links, wait a minute");
+      inputSchema: { slug: optionalSlug },
+      handler: ({ slug: given }) => guard(
+        () => onDiagram(given, async (slug2, note) => {
+          let code;
+          try {
+            code = await client.createLinkCode();
+          } catch (e) {
+            if (e instanceof PortalError && e.status === 429) {
+              return fail("Portal answered 429: too many unopened links, wait a minute");
+            }
+            throw e;
           }
-          throw e;
-        }
-        return ok(
-          `Open in the editor (signed in): ${client.openUrlFor(slug2, code)}
-This link works once and for about a minute; open it right away.`
-        );
-      })
+          return ok(
+            `Open in the editor (signed in): ${client.openUrlFor(slug2, code)}
+This link works once and for about a minute; open it right away.${note}`
+          );
+        })
+      )
     },
     show_diagram: {
-      description: "Show a saved diagram's current picture in the conversation. Returns the picture (PNG) to you, and an image link for the user: the chat asks the user to click 'Show image' before it loads a picture from an address, and does not show a tool's own image to them, so put the returned markdown in your reply. The link is not a publication: anyone who has the address sees the picture, with no sign-in, for about 15 minutes, and then it stops working. Reads the stored diagram, so it includes any edits the user made in the editor, and says which version it shows. Nothing is written to disk: use export_diagram for a file.",
-      inputSchema: { slug },
-      handler: ({ slug: slug2 }) => guard(async () => {
-        const out = await client.exportImage(slug2, "png", false);
-        if (!out.success || !out.bytes) {
-          return fail(
-            (out.errors.length ? errorLines(out.errors) : "The diagram does not render.") + `
-(diagram ${slug2}, version ${out.version}; nothing to show)`
-          );
-        }
-        const link = await imageLinkText(client, slug2);
-        if (out.bytes.length > MAX_SHOW_BYTES) {
-          return ok(
-            `The picture of diagram ${slug2} (version ${out.version}) is too large to show here (${out.bytes.length} bytes). Use export_diagram to save it as a file.
-${link}`
-          );
-        }
-        return {
-          content: [
-            { type: "image", data: out.bytes.toString("base64"), mimeType: "image/png" },
-            { type: "text", text: `Diagram ${slug2}, version ${out.version}.
-${link}` }
-          ]
-        };
-      })
+      description: "Show a saved diagram's current picture in the conversation (the diagram in focus when no slug is given). Returns the picture (PNG) to you, and an image link for the user: the chat asks the user to click 'Show image' before it loads a picture from an address, and does not show a tool's own image to them, so put the returned markdown in your reply. The link is not a publication: anyone who has the address sees the picture, with no sign-in, for about 15 minutes, and then it stops working. Reads the stored diagram, so it includes any edits the user made in the editor, and says which version it shows. Nothing is written to disk: use export_diagram for a file.",
+      inputSchema: { slug: optionalSlug },
+      handler: ({ slug: given }) => guard(
+        () => onDiagram(given, async (slug2, note) => {
+          const out = await client.exportImage(slug2, "png", false);
+          if (!out.success || !out.bytes) {
+            return fail(
+              (out.errors.length ? errorLines(out.errors) : "The diagram does not render.") + `
+(diagram ${slug2}, version ${out.version}; nothing to show)${note}`
+            );
+          }
+          const link = await imageLinkText(client, slug2);
+          if (out.bytes.length > MAX_SHOW_BYTES) {
+            return ok(
+              `The picture of diagram ${slug2} (version ${out.version}) is too large to show here (${out.bytes.length} bytes). Use export_diagram to save it as a file.
+${link}${note}`
+            );
+          }
+          return {
+            content: [
+              { type: "image", data: out.bytes.toString("base64"), mimeType: "image/png" },
+              { type: "text", text: `Diagram ${slug2}, version ${out.version}.
+${link}${note}` }
+            ]
+          };
+        })
+      )
     },
     export_diagram: {
       description: "Save the diagram as an SVG (default) or PNG file in the project folder, by default diagrams/<slug>.svg. The file records the diagram's slug, its version and its PlantUML source, so it can later be compared with get_diagram's version to see whether it is outdated. Returns the path and version, not the picture. Call it after create_diagram or update_diagram, and again when the user asks you to review their changes in the portal.",
       inputSchema: {
-        slug,
+        slug: optionalSlug,
         format: external_exports.enum(["svg", "png"]).default("svg").describe("svg (default) or png"),
         path: external_exports.string().optional().describe("File path relative to the project folder; must end in .svg or .png to match the format. Default: diagrams/<slug>.<format>")
       },
-      handler: ({ slug: slug2, format, path: requested }) => guard(async () => {
-        const fmt = format === "png" ? "png" : "svg";
-        const root = opts.exportRoot ?? exportRoot(process.env, process.cwd());
-        planExport(root, requested, slug2, fmt);
-        const out = await client.exportImage(slug2, fmt);
-        if (!out.success || !out.bytes) {
-          return fail(
-            (out.errors.length ? errorLines(out.errors) : "The diagram does not render.") + `
-(diagram ${slug2}, version ${out.version}; nothing was saved)`
+      handler: ({ slug: given, format, path: requested }) => guard(
+        () => onDiagram(given, async (slug2, note) => {
+          const fmt = format === "png" ? "png" : "svg";
+          const root = opts.exportRoot ?? exportRoot(process.env, process.cwd());
+          planExport(root, requested, slug2, fmt);
+          const out = await client.exportImage(slug2, fmt);
+          if (!out.success || !out.bytes) {
+            return fail(
+              (out.errors.length ? errorLines(out.errors) : "The diagram does not render.") + `
+(diagram ${slug2}, version ${out.version}; nothing was saved)${note}`
+            );
+          }
+          const saved = await writeExport(root, requested, slug2, fmt, out.bytes);
+          return ok(
+            `Saved ${saved.relPath} (${fmt.toUpperCase()}, ${saved.bytes} bytes): diagram ${slug2}, version ${out.version}, source embedded.
+The file records this slug and version; if get_diagram later reports a higher version, the file is outdated.${note}`
+          );
+        })
+      )
+    },
+    focus_diagram: {
+      description: "Make a diagram the one this conversation works on, and read it. `ref` is what the user gave you: a slug, the diagram's address in the portal (\u2026/?d=<slug>), a share link (\u2026/#share=\u2026), or the path of an image the portal exported (an SVG or PNG saved with its source, inside the project folder). A share link gives the user their own COPY of the diagram (changes do not reach the original); the user's own address or slug is the diagram itself. After this the other tools need no slug, and create_diagram refuses to make another diagram until the user asks for one. A picture pasted into the chat carries no id: ask for the file, the address or the slug instead.",
+      inputSchema: {
+        ref: external_exports.string().min(1).describe("A slug, the portal address of the diagram, a share link, or the path of an exported SVG/PNG in the project folder")
+      },
+      handler: ({ ref }) => guard(async () => {
+        const parsed = parseRef(ref, client.baseUrlForRefs());
+        if (parsed.kind === "invalid") return fail(`Cannot use that: ${parsed.why}.`);
+        let slug2;
+        let shared = null;
+        let fileVersion;
+        const gone = parsed.kind === "file" ? (s) => `The diagram in that file (slug ${s}) is not in your portal: it was deleted, or it belongs to someone else. If it is someone else's, ask them for a share link.` : (s) => `No diagram with slug ${s} in your portal: it was deleted, or it belongs to someone else. If it is someone else's, ask them for a share link.`;
+        if (parsed.kind === "slug" || parsed.kind === "editor") {
+          slug2 = parsed.slug;
+        } else if (parsed.kind === "share") {
+          try {
+            const s = await client.openShare(parsed.token);
+            slug2 = s.slug;
+            shared = { own: s.own };
+          } catch (e) {
+            if (e instanceof PortalError && e.status === 404) return fail("This share link has expired or does not exist.");
+            throw e;
+          }
+        } else {
+          const root = opts.exportRoot ?? exportRoot(process.env, process.cwd());
+          const id = readImageIdentity(await readProjectFile(root, parsed.path));
+          if (!id) {
+            return fail(
+              "That file carries no diagram id (it is not an image the portal exported with its source embedded). Ask the user for the diagram's address in the portal, a share link or the slug."
+            );
+          }
+          slug2 = id.slug;
+          fileVersion = id.version;
+        }
+        let d;
+        try {
+          d = await client.get(slug2);
+        } catch (e) {
+          if (e instanceof PortalError && (e.status === 404 || e.status === 403)) return fail(gone(slug2));
+          throw e;
+        }
+        const notes = [];
+        if (shared) {
+          notes.push(
+            shared.own ? "This share link is to your own diagram, so that diagram itself is now in focus." : "The share link gave you your own copy of the shared diagram. It is a copy: your changes do not reach the original."
           );
         }
-        const saved = await writeExport(root, requested, slug2, fmt, out.bytes);
+        if (fileVersion !== void 0 && fileVersion !== d.version) {
+          notes.push(`The file is version ${fileVersion}; the diagram is now at version ${d.version}.`);
+        }
+        const change = focus.changeSince(d.slug, d.version, d.source);
+        focus.saw(d.slug, d.version, d.source);
+        focus.set(d);
+        return ok(`Now working on diagram "${d.title}" (slug ${d.slug}, version ${d.version}).
+${notes.map((n) => n + "\n").join("")}
+${describe3(d, change)}`);
+      })
+    },
+    current_diagram: {
+      description: "Say which diagram this conversation is working on (the one in focus), or that there is none. Call it before doing anything with a diagram: it is how you find the diagram again after a long conversation, so that you update it instead of creating another.",
+      inputSchema: {},
+      handler: () => guard(async () => {
+        const f = focus.get();
         return ok(
-          `Saved ${saved.relPath} (${fmt.toUpperCase()}, ${saved.bytes} bytes): diagram ${slug2}, version ${out.version}, source embedded.
-The file records this slug and version; if get_diagram later reports a higher version, the file is outdated.`
+          f ? `In focus: "${f.title}" (slug ${f.slug}, version ${f.version} when last read).` : "No diagram is in focus. Pass a slug to a tool, or call focus_diagram with the diagram's address in the portal, a share link, or an exported image file."
         );
       })
     }
@@ -37213,7 +37525,7 @@ The file records this slug and version; if get_diagram later reports a higher ve
 }
 
 // src/update.ts
-var PLUGIN_VERSION = true ? "0.5.1" : "0.0.0";
+var PLUGIN_VERSION = true ? "0.6.0" : "0.0.0";
 var PUBLISHED_MANIFEST_URL = "https://raw.githubusercontent.com/rborisov/texdy-plugin/main/.claude-plugin/plugin.json";
 var VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
 var parse3 = (v) => {

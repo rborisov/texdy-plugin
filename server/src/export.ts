@@ -92,3 +92,35 @@ export async function writeExport(
   }
   return { ...plan, bytes: bytes.length };
 }
+
+const MAX_READ_BYTES = 20 * 1024 * 1024;
+
+// readProjectFile reads an exported image (.svg or .png) from the project folder, for focus_diagram. The path may be
+// relative to the folder or absolute inside it; it must stay inside, every folder on the way and the file itself must be
+// what they seem (no symbolic links), and the file may be at most 20 MB.
+export async function readProjectFile(root: string, requested: string): Promise<Buffer> {
+  const refuse = (why: string) => new PortalError(`Cannot read that file: ${why}`, 0);
+  if (!requested || requested.includes("\0")) throw refuse("the path is not usable");
+  const ext = path.extname(requested).toLowerCase();
+  if (ext !== ".svg" && ext !== ".png") throw refuse("only .svg and .png images are read");
+  const abs = path.resolve(root, requested);
+  const rel = path.relative(root, abs);
+  if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) throw refuse("the file must be inside the project folder");
+
+  let cur = root;
+  const parts = rel.split(path.sep);
+  for (const [i, part] of parts.entries()) {
+    cur = path.join(cur, part);
+    const st = await fs.lstat(cur).catch(() => null);
+    if (!st) throw refuse("there is no such file");
+    if (st.isSymbolicLink()) throw refuse(`"${part}" is a symbolic link`);
+    const last = i === parts.length - 1;
+    if (last ? !st.isFile() : !st.isDirectory()) throw refuse(last ? "it is not a file" : `"${part}" is not a folder`);
+    if (last && st.size > MAX_READ_BYTES) throw refuse("the file is too large (over 20 MB)");
+  }
+  try {
+    return await fs.readFile(cur);
+  } catch {
+    throw refuse("it could not be read");
+  }
+}
