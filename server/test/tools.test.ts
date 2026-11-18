@@ -31,12 +31,12 @@ const text = (r: Result) =>
     .map((c) => c.text)
     .join("\n");
 
-test("exposes exactly the seven tools", () => {
+test("exposes exactly the eight tools", () => {
   const tools = buildTools(new PortalClient("http://127.0.0.1:1", TOKEN));
   assert.deepEqual(Object.keys(tools).sort(), [...TOOL_NAMES].sort());
   assert.deepEqual(
     [...TOOL_NAMES].sort(),
-    ["create_diagram", "export_diagram", "get_diagram", "list_diagrams", "open_diagram", "render_diagram", "update_diagram"],
+    ["create_diagram", "export_diagram", "get_diagram", "list_diagrams", "open_diagram", "render_diagram", "show_diagram", "update_diagram"],
   );
 });
 

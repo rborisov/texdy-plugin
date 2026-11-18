@@ -10,7 +10,11 @@ export const TOOL_NAMES = [
   "list_diagrams",
   "open_diagram",
   "export_diagram",
+  "show_diagram",
 ] as const;
+
+// The largest picture show_diagram puts in the conversation; a bigger one is exported to a file instead.
+const MAX_SHOW_BYTES = 4 * 1024 * 1024;
 
 type Content =
   | { type: "text"; text: string }
@@ -225,6 +229,33 @@ export function buildTools(
           );
         }),
     },
+    show_diagram: {
+      description:
+        "Show a saved diagram's current picture (PNG) in the conversation, so the user can see the result. Reads the stored diagram, so it includes any edits the user made in the editor; says which version it shows. Nothing is written to disk: use export_diagram for a file.",
+      inputSchema: { slug },
+      handler: ({ slug }) =>
+        guard(async () => {
+          const out = await client.exportImage(slug, "png", false);
+          if (!out.success || !out.bytes) {
+            return fail(
+              (out.errors.length ? errorLines(out.errors) : "The diagram does not render.") +
+                `\n(diagram ${slug}, version ${out.version}; nothing to show)`,
+            );
+          }
+          if (out.bytes.length > MAX_SHOW_BYTES) {
+            return ok(
+              `The picture of diagram ${slug} (version ${out.version}) is too large to show here (${out.bytes.length} bytes). Use export_diagram to save it as a file.`,
+            );
+          }
+          return {
+            content: [
+              { type: "image", data: out.bytes.toString("base64"), mimeType: "image/png" },
+              { type: "text", text: `Diagram ${slug}, version ${out.version}.` },
+            ],
+          };
+        }),
+    },
+
     export_diagram: {
       description:
         "Save the diagram as an SVG (default) or PNG file in the project folder, by default diagrams/<slug>.svg. The file records the diagram's slug, its version and its PlantUML source, so it can later be compared with get_diagram's version to see whether it is outdated. Returns the path and version, not the picture. Call it after create_diagram or update_diagram, and again when the user asks you to review their changes in the portal.",

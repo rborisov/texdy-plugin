@@ -5,7 +5,7 @@ description: Use when the user asks to draw, create, change, fix or look at a UM
 
 # Mimosoid
 
-Diagrams live in the user's Mimosoid. Use the `mimosoid` MCP tools: `render_diagram`, `create_diagram`, `get_diagram`, `update_diagram`, `list_diagrams`, `open_diagram`, `export_diagram`.
+Diagrams live in the user's Mimosoid. Use the `mimosoid` MCP tools: `render_diagram`, `create_diagram`, `get_diagram`, `update_diagram`, `list_diagrams`, `open_diagram`, `export_diagram`, `show_diagram`.
 
 ## New diagram
 
@@ -21,6 +21,13 @@ Diagrams live in the user's Mimosoid. Use the `mimosoid` MCP tools: `render_diag
    - If the diagram is already open in the Browser pane, do not open a fresh link: it navigates the page and could lose unsaved edits (the editor refreshes by itself a few seconds after an update). Open a link only when the diagram is not open yet, or the page shows the sign-in dialog or "Sign-in link expired".
    - If `open_diagram` fails: on 429 ("too many unopened links, wait a minute") do not retry in a loop, tell the user to wait; on any other error (for example an old portal that does not know the endpoint) do not retry, tell the user and give them the plain `url` to open themselves and sign in normally.
    - The plain `url` from `create_diagram` / `get_diagram` is for sharing or printing; it does not sign anyone in. Do not open it for the user in place of the sign-in link; the only use as a fallback is to hand it to the user (see above) to open and sign in normally.
+
+## Showing the result in the chat
+
+After you create or change a diagram, and whenever the user asks to see it, put the picture in the conversation:
+
+- Where the client has a tool that sends a file to the user (the Claude desktop app's `SendUserFile`), send the file `export_diagram` saved (`diagrams/<slug>.svg`, or the path it reported). That is what the user sees as a picture in the chat; do not also call `show_diagram`, unless you need to see the picture yourself.
+- Otherwise call `show_diagram` with the slug. It returns the stored diagram's current picture, so it also shows edits the user made in the editor, and says which version it is. Some clients show a tool's image only to you, not to the user: if so, give the user the file path from `export_diagram` or the editor link instead.
 
 ## Existing diagram
 

@@ -254,10 +254,11 @@ export class PortalClient {
   // exportImage asks the portal for the stored diagram as an image carrying its source,
   // slug and version. The answer is checked against what was asked: the same diagram,
   // the same format, a version number and a real SVG or PNG.
-  async exportImage(slug: string, format: "svg" | "png"): Promise<ExportOutcome> {
+  // embedSource: put the diagram's source in the file (an export keeps it; a picture only for looking at need not).
+  async exportImage(slug: string, format: "svg" | "png", embedSource = true): Promise<ExportOutcome> {
     const j = await this.request(
       "GET",
-      `/api/diagrams/${encodeURIComponent(slug)}/image?format=${format}&embed_source=true`,
+      `/api/diagrams/${encodeURIComponent(slug)}/image?format=${format}${embedSource ? "&embed_source=true" : ""}`,
     );
     const odd = (why: string) => new PortalError(`Portal answered with an unexpected image: ${why}`, 200);
     if (j.slug !== slug) throw odd("it is about a different diagram");

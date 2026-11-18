@@ -36821,10 +36821,11 @@ var PortalClient = class {
   // exportImage asks the portal for the stored diagram as an image carrying its source,
   // slug and version. The answer is checked against what was asked: the same diagram,
   // the same format, a version number and a real SVG or PNG.
-  async exportImage(slug2, format) {
+  // embedSource: put the diagram's source in the file (an export keeps it; a picture only for looking at need not).
+  async exportImage(slug2, format, embedSource = true) {
     const j = await this.request(
       "GET",
-      `/api/diagrams/${encodeURIComponent(slug2)}/image?format=${format}&embed_source=true`
+      `/api/diagrams/${encodeURIComponent(slug2)}/image?format=${format}${embedSource ? "&embed_source=true" : ""}`
     );
     const odd = (why) => new PortalError(`Portal answered with an unexpected image: ${why}`, 200);
     if (j.slug !== slug2) throw odd("it is about a different diagram");
@@ -36947,6 +36948,7 @@ async function writeExport(root, requested, slug2, format, bytes) {
 }
 
 // src/tools.ts
+var MAX_SHOW_BYTES = 4 * 1024 * 1024;
 var ok = (text) => ({ content: [{ type: "text", text }] });
 var fail = (text) => ({ content: [{ type: "text", text }], isError: true });
 var slug = external_exports.string().regex(/^[0-9a-f]{12}$/, "slug must be 12 lowercase hex characters (the id in the ?d=<slug> link)").describe("Diagram slug: 12 lowercase hex characters (the id in the ?d=<slug> link)");
@@ -37127,6 +37129,30 @@ ${cur.source}`;
           `Open in the editor (signed in): ${client.openUrlFor(slug2, code)}
 This link works once and for about a minute; open it right away.`
         );
+      })
+    },
+    show_diagram: {
+      description: "Show a saved diagram's current picture (PNG) in the conversation, so the user can see the result. Reads the stored diagram, so it includes any edits the user made in the editor; says which version it shows. Nothing is written to disk: use export_diagram for a file.",
+      inputSchema: { slug },
+      handler: ({ slug: slug2 }) => guard(async () => {
+        const out = await client.exportImage(slug2, "png", false);
+        if (!out.success || !out.bytes) {
+          return fail(
+            (out.errors.length ? errorLines(out.errors) : "The diagram does not render.") + `
+(diagram ${slug2}, version ${out.version}; nothing to show)`
+          );
+        }
+        if (out.bytes.length > MAX_SHOW_BYTES) {
+          return ok(
+            `The picture of diagram ${slug2} (version ${out.version}) is too large to show here (${out.bytes.length} bytes). Use export_diagram to save it as a file.`
+          );
+        }
+        return {
+          content: [
+            { type: "image", data: out.bytes.toString("base64"), mimeType: "image/png" },
+            { type: "text", text: `Diagram ${slug2}, version ${out.version}.` }
+          ]
+        };
       })
     },
     export_diagram: {
