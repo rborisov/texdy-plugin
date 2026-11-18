@@ -10,6 +10,13 @@ const SLUG = "8c13156003a1";
 const PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEklEQVR4nGNkYPjPAAWMDAwMAAQiAQHdMkJPAAAAAElFTkSuQmCC";
 
+const TOKEN_PART = "Pau-Hx_QLUhzl02wifoEzCEYn4YNekV5";
+const LINK = { url: `/i/${TOKEN_PART}.png`, expires_at: "2030-01-02T03:04:05Z", slug: SLUG, version: 7 };
+
+// the picture, and (POST) a link to it
+const portal = (image: unknown, link: (r: Parameters<Handler>[1]) => void = (r) => json(r, 201, LINK)): Handler =>
+  (req, r) => (req.method === "POST" ? link(r) : json(r, 200, image));
+
 type Content = { type: string; text?: string; data?: string; mimeType?: string };
 async function show(handler: Handler, args: Record<string, unknown>) {
   const f = await startFake(handler);
@@ -25,7 +32,7 @@ const text = (r: { content: Content[] }) => r.content.filter((c) => c.type === "
 
 test("show_diagram returns the saved diagram's picture as an image, and says which version it is", async () => {
   const { res, seen } = await show(
-    (_q, r) => json(r, 200, { success: true, format: "png", image: PNG_B64, slug: SLUG, version: 7 }),
+    portal({ success: true, format: "png", image: PNG_B64, slug: SLUG, version: 7 }),
     { slug: SLUG },
   );
   assert.ok(!res.isError, text(res));
@@ -34,10 +41,57 @@ test("show_diagram returns the saved diagram's picture as an image, and says whi
   assert.equal(image?.mimeType, "image/png");
   assert.match(text(res), new RegExp(`${SLUG}.*version 7`));
   // a picture for looking at: the source need not be embedded in it
-  assert.equal(seen.length, 1);
   assert.equal(seen[0].method, "GET");
   assert.match(seen[0].path, new RegExp(`^/api/diagrams/${SLUG}/image\\?format=png`));
   assert.ok(!/embed_source=true/.test(seen[0].path), seen[0].path);
+});
+
+test("show_diagram also makes an image link, for the user, and gives the markdown to put in the reply", async () => {
+  const { res, seen } = await show(
+    portal({ success: true, format: "png", image: PNG_B64, slug: SLUG, version: 7 }),
+    { slug: SLUG },
+  );
+  const post = seen.find((s) => s.method === "POST")!;
+  assert.equal(post.path, `/api/diagrams/${SLUG}/image-link`);
+  assert.deepEqual(JSON.parse(post.body), { format: "png", ttl_minutes: 15, embed_source: false });
+  assert.equal(post.auth, `Bearer ${TOKEN}`);
+  // the address is the portal's own (the answer is relative to it)
+  const url = new RegExp(`http://127\\.0\\.0\\.1:\\d+/i/${TOKEN_PART}\\.png`);
+  assert.match(text(res), url);
+  assert.match(text(res), new RegExp(`!\\[[^\\]]*\\]\\(${url.source}\\)`), "the markdown that shows the picture");
+  assert.match(text(res), /2030/); // when it stops working
+  assert.match(text(res), /15 minutes|until/i);
+  // the model still gets the picture
+  assert.ok(res.content.some((c) => c.type === "image"));
+});
+
+test("show_diagram without image links on the portal still shows the picture, and says so", async () => {
+  const { res } = await show(
+    portal({ success: true, format: "png", image: PNG_B64, slug: SLUG, version: 7 }, (r) => json(r, 404, { error: "Not found" })),
+    { slug: SLUG },
+  );
+  assert.ok(!res.isError, text(res));
+  assert.ok(res.content.some((c) => c.type === "image"));
+  assert.match(text(res), /no image links|does not (support|have)/i);
+  assert.ok(!/!\[/.test(text(res)), "no markdown for a link there is not");
+});
+
+test("show_diagram reports why no link was made (too many, does not render) and still shows the picture", async () => {
+  const { res } = await show(
+    portal({ success: true, format: "png", image: PNG_B64, slug: SLUG, version: 7 }, (r) => json(r, 429, { error: "Too many active image links: wait for one to expire" })),
+    { slug: SLUG },
+  );
+  assert.ok(!res.isError, text(res));
+  assert.ok(res.content.some((c) => c.type === "image"));
+  assert.match(text(res), /Too many active image links/);
+  // a portal answer that is not a link is not trusted
+  for (const odd of [{ url: "http://evil.example/x.png", expires_at: "2030-01-02T03:04:05Z" }, { url: "/i/short.png", expires_at: "2030-01-02T03:04:05Z" }, { url: `/i/${TOKEN_PART}.png` }]) {
+    const { res: r2 } = await show(
+      portal({ success: true, format: "png", image: PNG_B64, slug: SLUG, version: 7 }, (r) => json(r, 201, odd)),
+      { slug: SLUG },
+    );
+    assert.ok(!/!\[/.test(text(r2)), JSON.stringify(odd));
+  }
 });
 
 test("show_diagram on a diagram that does not render lists the errors and shows no image", async () => {

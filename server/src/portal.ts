@@ -31,6 +31,13 @@ export interface DiagramSummary {
   url: string;
 }
 
+export interface ImageLinkRecord {
+  /** the full address of the picture */
+  url: string;
+  /** when it stops working (RFC 3339) */
+  expiresAt: string;
+}
+
 export interface RenderError {
   type: string;
   message: string;
@@ -137,6 +144,20 @@ export class PortalClient {
 
   openUrlFor(slug: string, code: string): string {
     return `${this.urlFor(slug)}&login=${encodeURIComponent(code)}`;
+  }
+
+  // A link to the picture of the diagram as it is now, for a while: anyone who has it sees the picture, with no sign-in,
+  // until it expires. Nothing is published. The address is the portal's own; the answer is checked before it is trusted.
+  async createImageLink(slug: string, ttlMinutes = 15): Promise<ImageLinkRecord> {
+    const j = await this.request("POST", `/api/diagrams/${encodeURIComponent(slug)}/image-link`, {
+      format: "png",
+      ttl_minutes: ttlMinutes,
+      embed_source: false,
+    });
+    const odd = (why: string) => new PortalError(`Portal answered with an unexpected image link: ${why}`, 201);
+    if (typeof j.url !== "string" || !/^\/i\/[A-Za-z0-9_-]{16,64}\.png$/.test(j.url)) throw odd("no usable address");
+    if (typeof j.expires_at !== "string" || Number.isNaN(Date.parse(j.expires_at))) throw odd("no expiry time");
+    return { url: `${this.baseUrl}${j.url}`, expiresAt: j.expires_at };
   }
 
   // One-time sign-in code for the editor link; valid for about a minute.

@@ -36721,6 +36721,19 @@ var PortalClient = class {
   openUrlFor(slug2, code) {
     return `${this.urlFor(slug2)}&login=${encodeURIComponent(code)}`;
   }
+  // A link to the picture of the diagram as it is now, for a while: anyone who has it sees the picture, with no sign-in,
+  // until it expires. Nothing is published. The address is the portal's own; the answer is checked before it is trusted.
+  async createImageLink(slug2, ttlMinutes = 15) {
+    const j = await this.request("POST", `/api/diagrams/${encodeURIComponent(slug2)}/image-link`, {
+      format: "png",
+      ttl_minutes: ttlMinutes,
+      embed_source: false
+    });
+    const odd = (why) => new PortalError(`Portal answered with an unexpected image link: ${why}`, 201);
+    if (typeof j.url !== "string" || !/^\/i\/[A-Za-z0-9_-]{16,64}\.png$/.test(j.url)) throw odd("no usable address");
+    if (typeof j.expires_at !== "string" || Number.isNaN(Date.parse(j.expires_at))) throw odd("no expiry time");
+    return { url: `${this.baseUrl}${j.url}`, expiresAt: j.expires_at };
+  }
   // One-time sign-in code for the editor link; valid for about a minute.
   async createLinkCode() {
     const j = await this.request("POST", "/api/auth/link-codes");
@@ -37004,6 +37017,19 @@ var chosenType = external_exports.enum([...CHOSEN_TYPES, "auto"]).optional().des
   "The type the editor's tools follow for this diagram (Constructor actions, style presets, @start keywords). Optional: omit to leave it as it is; 'auto' clears it so the type PlantUML recognizes is used. It does not rewrite the source: write the matching @start\u2026/@end\u2026 keywords yourself, and PlantUML still reports what it recognizes in the text."
 );
 var portalChosen = (t) => t === void 0 ? void 0 : t === "auto" ? "" : t;
+async function imageLinkText(client, slug2) {
+  try {
+    const l = await client.createImageLink(slug2);
+    return `Image link for the user (anyone who has this address sees this picture, with no sign-in, until ${l.expiresAt}; nothing is published): ${l.url}
+To show it in the chat, put this in your reply: ![Diagram ${slug2}](${l.url})`;
+  } catch (e) {
+    if (e instanceof PortalError && e.status === 404) {
+      return "No image link: this portal has no image links yet (it needs to be updated). Give the user the file from export_diagram or the editor link instead.";
+    }
+    const why = e instanceof PortalError || e instanceof Error ? e.message : "unknown error";
+    return `No image link could be made (${why}). Give the user the file from export_diagram or the editor link instead.`;
+  }
+}
 function buildTools(client, opts = {}) {
   return {
     render_diagram: {
@@ -37132,7 +37158,7 @@ This link works once and for about a minute; open it right away.`
       })
     },
     show_diagram: {
-      description: "Show a saved diagram's current picture (PNG) in the conversation, so the user can see the result. Reads the stored diagram, so it includes any edits the user made in the editor; says which version it shows. Nothing is written to disk: use export_diagram for a file.",
+      description: "Show a saved diagram's current picture in the conversation. Returns the picture (PNG) to you, and an image link for the user: the chat asks the user to click 'Show image' before it loads a picture from an address, and does not show a tool's own image to them, so put the returned markdown in your reply. The link is not a publication: anyone who has the address sees the picture, with no sign-in, for about 15 minutes, and then it stops working. Reads the stored diagram, so it includes any edits the user made in the editor, and says which version it shows. Nothing is written to disk: use export_diagram for a file.",
       inputSchema: { slug },
       handler: ({ slug: slug2 }) => guard(async () => {
         const out = await client.exportImage(slug2, "png", false);
@@ -37142,15 +37168,18 @@ This link works once and for about a minute; open it right away.`
 (diagram ${slug2}, version ${out.version}; nothing to show)`
           );
         }
+        const link = await imageLinkText(client, slug2);
         if (out.bytes.length > MAX_SHOW_BYTES) {
           return ok(
-            `The picture of diagram ${slug2} (version ${out.version}) is too large to show here (${out.bytes.length} bytes). Use export_diagram to save it as a file.`
+            `The picture of diagram ${slug2} (version ${out.version}) is too large to show here (${out.bytes.length} bytes). Use export_diagram to save it as a file.
+${link}`
           );
         }
         return {
           content: [
             { type: "image", data: out.bytes.toString("base64"), mimeType: "image/png" },
-            { type: "text", text: `Diagram ${slug2}, version ${out.version}.` }
+            { type: "text", text: `Diagram ${slug2}, version ${out.version}.
+${link}` }
           ]
         };
       })

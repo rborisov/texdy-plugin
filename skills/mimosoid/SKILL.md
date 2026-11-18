@@ -24,10 +24,9 @@ Diagrams live in the user's Mimosoid. Use the `mimosoid` MCP tools: `render_diag
 
 ## Showing the result in the chat
 
-After you create or change a diagram, and whenever the user asks to see it, put the picture in the conversation:
+After you create or change a diagram, and whenever the user asks to see it, call `show_diagram` with the slug. It returns the picture to you and an **image link** for the user, with the markdown to show it: `![Diagram …](https://…/i/<token>.png)`. Put that markdown in your reply. The chat does not show a tool's own image to the user, and it asks them to click "Show image" before it loads a picture from an address, so tell them to click it. The link works for about 15 minutes, for anyone who has the address (nothing is published; the picture is a snapshot of that version); if it has expired, call `show_diagram` again for a fresh one.
 
-- Where the client has a tool that sends a file to the user (the Claude desktop app's `SendUserFile`), send the file `export_diagram` saved (`diagrams/<slug>.svg`, or the path it reported). That is what the user sees as a picture in the chat; do not also call `show_diagram`, unless you need to see the picture yourself.
-- Otherwise call `show_diagram` with the slug. It returns the stored diagram's current picture, so it also shows edits the user made in the editor, and says which version it is. Some clients show a tool's image only to you, not to the user: if so, give the user the file path from `export_diagram` or the editor link instead.
+If `show_diagram` says no image link could be made (an older portal, or too many links), give the user the editor link, or the file `export_diagram` saved. Do not use a file-sending tool for this. For a link the user can keep or share, they publish the diagram in the editor; you do not publish for them.
 
 ## Existing diagram
 

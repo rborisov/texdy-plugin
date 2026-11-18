@@ -163,7 +163,7 @@ Other agents have no skill, so tell them the workflow once, in the file they rea
 | `list_diagrams` | Lists your diagrams |
 | `open_diagram` | A one-time link that opens the editor signed in |
 | `export_diagram` | Saves an SVG (or PNG) into the project folder with the diagram's source, slug and version embedded in the file |
-| `show_diagram` | Shows the saved diagram's current picture in the conversation (some clients show a tool's image only to the agent; then it gives you the file path or link instead) |
+| `show_diagram` | Shows the saved diagram's current picture in the chat: the agent gets the picture and gives you an image link (it works for about 15 minutes and nothing is published); the chat asks you to click "Show image" |
 
 An exported SVG or PNG carries its own source, so you can open it, see which diagram and version it came from, and recover the source from it.
 

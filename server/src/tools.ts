@@ -85,6 +85,24 @@ const chosenType = z
 /** 'auto' is the portal's empty choice. */
 const portalChosen = (t: string | undefined) => (t === undefined ? undefined : t === "auto" ? "" : t);
 
+// The image link for show_diagram, as the text that goes after the picture. A link that could not be made is a note, never
+// a failure: the picture was fetched all the same.
+async function imageLinkText(client: PortalClient, slug: string): Promise<string> {
+  try {
+    const l = await client.createImageLink(slug);
+    return (
+      `Image link for the user (anyone who has this address sees this picture, with no sign-in, until ${l.expiresAt}; nothing is published): ${l.url}\n` +
+      `To show it in the chat, put this in your reply: ![Diagram ${slug}](${l.url})`
+    );
+  } catch (e) {
+    if (e instanceof PortalError && e.status === 404) {
+      return "No image link: this portal has no image links yet (it needs to be updated). Give the user the file from export_diagram or the editor link instead.";
+    }
+    const why = e instanceof PortalError || e instanceof Error ? e.message : "unknown error";
+    return `No image link could be made (${why}). Give the user the file from export_diagram or the editor link instead.`;
+  }
+}
+
 export interface ToolOptions {
   /** where export_diagram may write; default: the project folder (see exportRoot) */
   exportRoot?: string;
@@ -231,7 +249,7 @@ export function buildTools(
     },
     show_diagram: {
       description:
-        "Show a saved diagram's current picture (PNG) in the conversation, so the user can see the result. Reads the stored diagram, so it includes any edits the user made in the editor; says which version it shows. Nothing is written to disk: use export_diagram for a file.",
+        "Show a saved diagram's current picture in the conversation. Returns the picture (PNG) to you, and an image link for the user: the chat asks the user to click 'Show image' before it loads a picture from an address, and does not show a tool's own image to them, so put the returned markdown in your reply. The link is not a publication: anyone who has the address sees the picture, with no sign-in, for about 15 minutes, and then it stops working. Reads the stored diagram, so it includes any edits the user made in the editor, and says which version it shows. Nothing is written to disk: use export_diagram for a file.",
       inputSchema: { slug },
       handler: ({ slug }) =>
         guard(async () => {
@@ -242,15 +260,16 @@ export function buildTools(
                 `\n(diagram ${slug}, version ${out.version}; nothing to show)`,
             );
           }
+          const link = await imageLinkText(client, slug);
           if (out.bytes.length > MAX_SHOW_BYTES) {
             return ok(
-              `The picture of diagram ${slug} (version ${out.version}) is too large to show here (${out.bytes.length} bytes). Use export_diagram to save it as a file.`,
+              `The picture of diagram ${slug} (version ${out.version}) is too large to show here (${out.bytes.length} bytes). Use export_diagram to save it as a file.\n${link}`,
             );
           }
           return {
             content: [
               { type: "image", data: out.bytes.toString("base64"), mimeType: "image/png" },
-              { type: "text", text: `Diagram ${slug}, version ${out.version}.` },
+              { type: "text", text: `Diagram ${slug}, version ${out.version}.\n${link}` },
             ],
           };
         }),
