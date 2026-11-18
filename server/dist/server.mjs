@@ -37213,7 +37213,7 @@ The file records this slug and version; if get_diagram later reports a higher ve
 }
 
 // src/update.ts
-var PLUGIN_VERSION = true ? "0.5.0" : "0.0.0";
+var PLUGIN_VERSION = true ? "0.5.1" : "0.0.0";
 var PUBLISHED_MANIFEST_URL = "https://raw.githubusercontent.com/rborisov/texdy-plugin/main/.claude-plugin/plugin.json";
 var VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
 var parse3 = (v) => {

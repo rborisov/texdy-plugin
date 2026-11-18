@@ -20,7 +20,7 @@ Diagrams live in the user's Mimosoid. Use the `mimosoid` MCP tools: `render_diag
    - If the page shows "This sign-in link is for another account", do not open more links: tell the user they are signed in to the portal as a different account and must log out of the portal first.
    - If the diagram is already open in the Browser pane, do not open a fresh link: it navigates the page and could lose unsaved edits (the editor refreshes by itself a few seconds after an update). Open a link only when the diagram is not open yet, or the page shows the sign-in dialog or "Sign-in link expired".
    - If `open_diagram` fails: on 429 ("too many unopened links, wait a minute") do not retry in a loop, tell the user to wait; on any other error (for example an old portal that does not know the endpoint) do not retry, tell the user and give them the plain `url` to open themselves and sign in normally.
-   - The plain `url` from `create_diagram` / `get_diagram` is for sharing or printing; it does not sign anyone in. Do not open it for the user in place of the sign-in link; the only use as a fallback is to hand it to the user (see above) to open and sign in normally.
+   - The plain `url` from `create_diagram` / `get_diagram` (`https://…/?d=<slug>`) does not sign anyone in. Always give it to the user as a link in your reply, so they can open that exact diagram themselves and check it (they sign in normally if they are not signed in yet). Never open it for them in place of the sign-in link, and never show the one-time `open_diagram` link in text as if it were this one.
 
 ## Showing the result in the chat
 
@@ -49,6 +49,14 @@ The editor shows the update within a few seconds; the user does not need to relo
 The portal does not tell you about edits, so you only learn of them when the user says so ("review my changes"). Then call `get_diagram` for the current source and version, and `export_diagram` to refresh the file. The version in the file you exported earlier (and in your earlier results) is the one you last saw: if `get_diagram` reports a higher one, the diagram was modified. Review the new source; do not read the exported file into the conversation unless you need to see the picture, because it is large.
 
 An exported file says which diagram it is: the SVG has `<source … slug="…" version="N">`, a PNG has the text chunks `uml-portal-slug` and `uml-portal-version`. For a file found in the project, compare its slug and version with `get_diagram` to see whether it is the same diagram and whether it is outdated.
+
+## Tell the user what you created
+
+Whatever you create leaves something behind: a diagram in the user's portal, a file in their project, an image link. Never delete or clean up anything yourself. Say what exists, so the user can decide what to do with it:
+
+- After you create, update or export something, name it in one short line each: the diagram's title and slug with its plain `url` as a link they can click to open that exact diagram and verify it; the path `export_diagram` saved; for an image link only that it expires by itself.
+- For a diagram or file you made only to try something out (a test, an example), say that it is still in the portal and in the project's `diagrams/` folder. Do not ask whether to delete it: the plugin has no delete tool, and the user removes things themselves.
+- List only what you created in this conversation, never the user's other diagrams.
 
 ## Plugin updates
 
