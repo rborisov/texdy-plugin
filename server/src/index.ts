@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { PortalClient, validateConfig } from "./portal.ts";
 import { buildTools } from "./tools.ts";
+import { PLUGIN_VERSION, startUpdateCheck, withUpdateNotice } from "./update.ts";
 
 let config: { baseUrl: string; token: string };
 try {
@@ -11,8 +12,10 @@ try {
   process.exit(1);
 }
 
-const server = new McpServer({ name: "mimosoid", version: "0.1.0" });
-const tools = buildTools(new PortalClient(config.baseUrl, config.token));
+const server = new McpServer({ name: "mimosoid", version: PLUGIN_VERSION });
+// the first tool result of a session says so when a newer plugin is published (switch off: MIMOSOID_NO_UPDATE_CHECK=1)
+const getUpdateNotice = startUpdateCheck({ current: PLUGIN_VERSION, env: process.env });
+const tools = withUpdateNotice(buildTools(new PortalClient(config.baseUrl, config.token)), getUpdateNotice);
 for (const [name, def] of Object.entries(tools)) {
   server.registerTool(
     name,

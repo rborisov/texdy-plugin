@@ -61,12 +61,18 @@ shows which values are set; start a new session after changing them.
 
 ### Update
 
+**Let Claude Code do it.** A marketplace you added yourself does not update automatically until you turn that on: in Claude Code run `/plugin`, open **Marketplaces**, choose `mimosoid-marketplace` and select **Enable auto-update**. From then on each new session refreshes the plugin (you see "Plugin updated … Run /reload-plugins"), and the next session uses the new version.
+
+**By hand:**
+
 ```bash
 claude plugin marketplace update mimosoid-marketplace
 claude plugin update mimosoid@mimosoid-marketplace
 ```
 
 Then start a new session.
+
+**The plugin tells you.** At the first tool call of a session the plugin compares its version with the published one. If a newer plugin is out, the agent tells you once and gives these steps (for a git clone: `git pull` in the clone, then restart the agent). It asks GitHub for one small public file, `.claude-plugin/plugin.json` of the plugin repository, and sends nothing about you; a failed check is silent. Set `MIMOSOID_NO_UPDATE_CHECK=1` in the plugin's environment to turn the check off.
 
 ### Uninstall
 

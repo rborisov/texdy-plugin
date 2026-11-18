@@ -3871,7 +3871,7 @@ var require_fast_uri = __commonJS({
         normalizeString(uri, options);
       } else if (typeof uri === "object") {
         uri = /** @type {T} */
-        parse3(serialize(uri, options), options);
+        parse4(serialize(uri, options), options);
       }
       return uri;
     }
@@ -3914,8 +3914,8 @@ var require_fast_uri = __commonJS({
     function resolveComponent(base, relative, options, skipNormalization) {
       const target = {};
       if (!skipNormalization) {
-        base = parse3(serialize(base, options), options);
-        relative = parse3(serialize(relative, options), options);
+        base = parse4(serialize(base, options), options);
+        relative = parse4(serialize(relative, options), options);
       }
       options = options || {};
       if (!options.tolerant && relative.scheme) {
@@ -4233,7 +4233,7 @@ var require_fast_uri = __commonJS({
       }
       return { parsed, malformedAuthorityOrPort, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme };
     }
-    function parse3(uri, opts) {
+    function parse4(uri, opts) {
       return parseWithStatus(uri, opts).parsed;
     }
     function normalizeString(uri, opts) {
@@ -4270,7 +4270,7 @@ var require_fast_uri = __commonJS({
       resolveComponent,
       equal,
       serialize,
-      parse: parse3
+      parse: parse4
     };
     module.exports = fastUri;
     module.exports.default = fastUri;
@@ -12745,18 +12745,18 @@ var validateAsync = async (schema, value, _ctx) => {
   return result.issues.length === 0;
 };
 var _encode = (_Err) => {
-  const parse3 = _parse(_Err);
+  const parse4 = _parse(_Err);
   const fn = (schema, value, _ctx, _params) => {
     const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
-    return parse3(schema, value, ctx, finalizeParams(fn, _params));
+    return parse4(schema, value, ctx, finalizeParams(fn, _params));
   };
   return fn;
 };
 var encode = /* @__PURE__ */ _encode($ZodRealError);
 var _decode = (_Err) => {
-  const parse3 = _parse(_Err);
+  const parse4 = _parse(_Err);
   const fn = (schema, value, _ctx, _params) => {
-    return parse3(schema, value, _ctx, finalizeParams(fn, _params));
+    return parse4(schema, value, _ctx, finalizeParams(fn, _params));
   };
   return fn;
 };
@@ -14251,7 +14251,7 @@ function capSize(inst, size) {
   if (!caps.length)
     return;
   const cap = Math.min(...caps.map((c) => c[0]));
-  const parse3 = inst._zod.parse;
+  const parse4 = inst._zod.parse;
   inst._zod.parse = (payload, ctx) => {
     const n = size(payload.value);
     if (n > cap && !ctx?.skipChecks && ctx?.direction !== "backward") {
@@ -14265,7 +14265,7 @@ function capSize(inst, size) {
         }
       }
     }
-    return parse3(payload, ctx);
+    return parse4(payload, ctx);
   };
 }
 var arraySize = (input2) => Array.isArray(input2) ? input2.length : -1;
@@ -37212,6 +37212,79 @@ The file records this slug and version; if get_diagram later reports a higher ve
   };
 }
 
+// src/update.ts
+var PLUGIN_VERSION = true ? "0.5.0" : "0.0.0";
+var PUBLISHED_MANIFEST_URL = "https://raw.githubusercontent.com/rborisov/texdy-plugin/main/.claude-plugin/plugin.json";
+var VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
+var parse3 = (v) => {
+  const m = VERSION.exec(v);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+};
+function isNewer(latest, current) {
+  const a = parse3(latest);
+  const b = parse3(current);
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return false;
+}
+async function fetchPublishedVersion(url2 = PUBLISHED_MANIFEST_URL, o = {}) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), o.timeoutMs ?? 3e3);
+  try {
+    const res = await fetch(url2, { signal: ac.signal, headers: { Accept: "application/json" } });
+    if (!res.ok) return null;
+    const body = await res.text();
+    if (body.length > 1e5) return null;
+    const version2 = JSON.parse(body).version;
+    return typeof version2 === "string" && VERSION.test(version2) ? version2 : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function updateNotice(current, latest) {
+  return [
+    `Plugin update available: this is the mimosoid plugin ${current}, and ${latest} is published. Tell the user once, in your own words, and do not run these commands yourself:`,
+    "- Claude Code: run `claude plugin marketplace update mimosoid-marketplace`, then `claude plugin update mimosoid@mimosoid-marketplace`, then restart Claude Code. To get updates without doing this: /plugin, Marketplaces, mimosoid-marketplace, Enable auto-update.",
+    "- Another agent running a git clone of the plugin: run `git pull` in the clone and restart the agent."
+  ].join("\n");
+}
+function startUpdateCheck(o) {
+  const off = (o.env.MIMOSOID_NO_UPDATE_CHECK ?? "").toLowerCase();
+  if (off === "1" || off === "true") return async () => null;
+  const check2 = fetchPublishedVersion(o.url).then((latest) => latest && isNewer(latest, o.current) ? updateNotice(o.current, latest) : null);
+  return async () => {
+    let timer;
+    const gaveUp = new Promise((resolve) => {
+      timer = setTimeout(() => resolve(null), o.waitMs ?? 1500);
+    });
+    try {
+      return await Promise.race([check2, gaveUp]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+function withUpdateNotice(tools2, getNotice) {
+  let shown = false;
+  const wrapped = {};
+  for (const [name, def] of Object.entries(tools2)) {
+    wrapped[name] = {
+      ...def,
+      handler: async (args) => {
+        const result = await def.handler(args);
+        if (shown) return result;
+        const notice = await getNotice();
+        if (!notice) return result;
+        shown = true;
+        return { ...result, content: [...result.content, { type: "text", text: notice }] };
+      }
+    };
+  }
+  return wrapped;
+}
+
 // src/index.ts
 var config2;
 try {
@@ -37221,8 +37294,9 @@ try {
 `);
   process.exit(1);
 }
-var server = new McpServer({ name: "mimosoid", version: "0.1.0" });
-var tools = buildTools(new PortalClient(config2.baseUrl, config2.token));
+var server = new McpServer({ name: "mimosoid", version: PLUGIN_VERSION });
+var getUpdateNotice = startUpdateCheck({ current: PLUGIN_VERSION, env: process.env });
+var tools = withUpdateNotice(buildTools(new PortalClient(config2.baseUrl, config2.token)), getUpdateNotice);
 for (const [name, def] of Object.entries(tools)) {
   server.registerTool(
     name,
