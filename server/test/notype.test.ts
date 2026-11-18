@@ -54,7 +54,7 @@ test("create_diagram sends no diagram_type, even if a caller still passes one", 
   assert.ok(!res.isError, text(res));
   const body = JSON.parse(seen[0].body);
   assert.ok(!("diagram_type" in body), JSON.stringify(body));
-  assert.deepEqual(Object.keys(body).sort(), ["source", "title"]);
+  assert.deepEqual(Object.keys(body).sort(), ["apply_default_look", "source", "title"]);
 });
 
 test("update_diagram sends no diagram_type", async () => {
@@ -107,7 +107,7 @@ test("create_diagram sends the chosen type when given, and not when omitted", as
     json(r, 201, { slug: SLUG, title: "T", diagram_type: "", chosen_type: "mindmap", source: "s", version: 1 });
   const given = await call(reply as Handler, "create_diagram", { title: "T", source: "@startmindmap\n* a\n@endmindmap", chosen_type: "mindmap" });
   assert.ok(!given.res.isError, text(given.res));
-  assert.deepEqual(Object.keys(JSON.parse(given.seen[0].body)).sort(), ["chosen_type", "source", "title"]);
+  assert.deepEqual(Object.keys(JSON.parse(given.seen[0].body)).sort(), ["apply_default_look", "chosen_type", "source", "title"]);
   assert.equal(JSON.parse(given.seen[0].body).chosen_type, "mindmap");
   assert.match(text(given.res), /chosen type: mindmap/);
 

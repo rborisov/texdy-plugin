@@ -19,6 +19,10 @@ export interface DiagramRecord {
   source: string;
   version: number;
   url: string;
+  /** the default look the portal put into a new diagram ('' = none): a look id such as "soft" */
+  lookApplied: string;
+  /** "full" (the family's whole block) or "base" (only the basics: the kind was not known yet); '' = none */
+  lookLevel: string;
 }
 
 export interface DiagramSummary {
@@ -266,6 +270,9 @@ export class PortalClient {
       title: String(j.title ?? ""),
       diagramType: String(j.diagram_type ?? ""),
       chosenType: String(j.chosen_type ?? ""),
+      // the portal's words about a look are data: only a plain id and one of two levels are passed on
+      lookApplied: /^[a-z]{2,20}$/.test(String(j.look_applied ?? "")) ? String(j.look_applied) : "",
+      lookLevel: j.look_level === "full" || j.look_level === "base" ? j.look_level : "",
       source: String(j.source ?? ""),
       version: Number(j.version ?? 0),
       url: this.urlFor(slug),
@@ -324,6 +331,8 @@ export class PortalClient {
     const j = await this.request("POST", "/api/diagrams", {
       title,
       source,
+      // the user's default look (set on the portal's settings page) goes into the new diagram: the portal decides how much
+      apply_default_look: true,
       ...(chosenType !== undefined ? { chosen_type: chosenType } : {}),
     });
     return this.record(j);

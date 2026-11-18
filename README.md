@@ -164,7 +164,7 @@ Other agents have no skill, so tell them the workflow once, in the file they rea
 | Tool | What it does |
 |---|---|
 | `render_diagram` | Checks PlantUML without saving; returns the picture, or errors with line numbers |
-| `create_diagram` | Saves a new diagram, which becomes the one being worked on (it refuses to make another until you ask for one); returns slug, version and link. Optional `chosen_type` sets the type you want the editor's tools to follow |
+| `create_diagram` | Saves a new diagram in your default style (Settings, New diagrams), which becomes the one being worked on (it refuses to make another until you ask for one); returns slug, version and link. Optional `chosen_type` sets the type you want the editor's tools to follow |
 | `get_diagram` | Returns title, type, chosen type (when set), version, link and source |
 | `update_diagram` | Replaces the source (and optionally the title or `chosen_type`; `auto` clears it); needs `base_version`, refuses to overwrite someone else's change |
 | `list_diagrams` | Lists your diagrams |

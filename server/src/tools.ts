@@ -206,10 +206,17 @@ export function buildTools(
           }
           const d = await client.create(title, source, portalChosen(chosen_type));
           focus.set(d);
-          focus.saw(d.slug, d.version, source);
+          // what the portal stored (it may have added the user's look) is what Claude knows of the diagram now
+          focus.saw(d.slug, d.version, d.source || source);
           const chosen = d.chosenType ? `, chosen type: ${d.chosenType}` : "";
+          const look = d.lookApplied
+            ? `\nApplied your default style: ${d.lookApplied[0].toUpperCase()}${d.lookApplied.slice(1)}.` +
+              (d.lookLevel === "base"
+                ? " Only the basics for now: the rest of the style is added in the editor once PlantUML recognizes what kind of diagram it is."
+                : "")
+            : "";
           return ok(
-            `Created diagram "${d.title}" (slug ${d.slug}, version ${d.version}${chosen}). It is now the diagram in focus.\nOpen in the editor: ${d.url}`,
+            `Created diagram "${d.title}" (slug ${d.slug}, version ${d.version}${chosen}). It is now the diagram in focus.${look}\nOpen in the editor: ${d.url}`,
           );
         }),
     },

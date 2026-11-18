@@ -36830,6 +36830,9 @@ var PortalClient = class {
       title: String(j.title ?? ""),
       diagramType: String(j.diagram_type ?? ""),
       chosenType: String(j.chosen_type ?? ""),
+      // the portal's words about a look are data: only a plain id and one of two levels are passed on
+      lookApplied: /^[a-z]{2,20}$/.test(String(j.look_applied ?? "")) ? String(j.look_applied) : "",
+      lookLevel: j.look_level === "full" || j.look_level === "base" ? j.look_level : "",
       source: String(j.source ?? ""),
       version: Number(j.version ?? 0),
       url: this.urlFor(slug2)
@@ -36879,6 +36882,8 @@ var PortalClient = class {
     const j = await this.request("POST", "/api/diagrams", {
       title,
       source,
+      // the user's default look (set on the portal's settings page) goes into the new diagram: the portal decides how much
+      apply_default_look: true,
       ...chosenType2 !== void 0 ? { chosen_type: chosenType2 } : {}
     });
     return this.record(j);
@@ -37300,10 +37305,12 @@ ${d.source}`;
         }
         const d = await client.create(title, source, portalChosen(chosen_type));
         focus.set(d);
-        focus.saw(d.slug, d.version, source);
+        focus.saw(d.slug, d.version, d.source || source);
         const chosen = d.chosenType ? `, chosen type: ${d.chosenType}` : "";
+        const look = d.lookApplied ? `
+Applied your default style: ${d.lookApplied[0].toUpperCase()}${d.lookApplied.slice(1)}.` + (d.lookLevel === "base" ? " Only the basics for now: the rest of the style is added in the editor once PlantUML recognizes what kind of diagram it is." : "") : "";
         return ok(
-          `Created diagram "${d.title}" (slug ${d.slug}, version ${d.version}${chosen}). It is now the diagram in focus.
+          `Created diagram "${d.title}" (slug ${d.slug}, version ${d.version}${chosen}). It is now the diagram in focus.${look}
 Open in the editor: ${d.url}`
         );
       })
@@ -37525,7 +37532,7 @@ ${describe3(d, change)}`);
 }
 
 // src/update.ts
-var PLUGIN_VERSION = true ? "0.6.0" : "0.0.0";
+var PLUGIN_VERSION = true ? "0.7.0" : "0.0.0";
 var PUBLISHED_MANIFEST_URL = "https://raw.githubusercontent.com/rborisov/texdy-plugin/main/.claude-plugin/plugin.json";
 var VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
 var parse3 = (v) => {

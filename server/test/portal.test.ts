@@ -61,7 +61,7 @@ test("create: POST /api/diagrams with bearer and JSON body; url is the deep link
     assert.equal(f.seen[0].method, "POST");
     assert.equal(f.seen[0].path, "/api/diagrams");
     assert.equal(f.seen[0].auth, `Bearer ${TOKEN}`);
-    assert.deepEqual(JSON.parse(f.seen[0].body), { title: "T", source: "src" });
+    assert.deepEqual(JSON.parse(f.seen[0].body), { title: "T", source: "src", apply_default_look: true });
     assert.equal(d.url, `${f.url}/?d=abc123`);
     assert.equal(d.diagramType, "sequence"); // a type the portal reports is still read back
     assert.equal(d.version, 3);
