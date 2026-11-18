@@ -145,6 +145,33 @@ test("render_diagram failure lists errors with line numbers", async () => {
   assert.match(text(r), /No line here/);
 });
 
+test("render_diagram failure passes on the text of the line, the hint and the mended line", async () => {
+  const r = await run(
+    (_q, res) =>
+      json(res, 200, {
+        success: false,
+        format: "png",
+        errors: [
+          {
+            type: "syntax",
+            message: "PlantUML cannot read this line",
+            line: 6,
+            snippet: "  participant Fleet Backend",
+            hint: "A name with a space must be in quotes.",
+            suggestion: '  participant "Fleet Backend" as FleetBackend',
+          },
+        ],
+      }),
+    "render_diagram",
+    { source: "bad" },
+  );
+  assert.equal(r.isError, true);
+  assert.match(text(r), /line 6: PlantUML cannot read this line/);
+  assert.match(text(r), /text: participant Fleet Backend\n/);
+  assert.match(text(r), /hint: A name with a space must be in quotes\./);
+  assert.match(text(r), /fix:  participant "Fleet Backend" as FleetBackend/);
+});
+
 test("create_diagram returns slug, version and deep link", async () => {
   const r = await run(
     (_q, res) =>

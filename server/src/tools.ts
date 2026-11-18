@@ -34,9 +34,22 @@ const slug = z
   .string()
   .regex(/^[0-9a-f]{12}$/, "slug must be 12 lowercase hex characters (the id in the ?d=<slug> link)")
   .describe("Diagram slug: 12 lowercase hex characters (the id in the ?d=<slug> link)");
-// "Errors:" text for a diagram that did not render, with PlantUML's line numbers.
+// "Errors:" text for a diagram that did not render: PlantUML's line, what is on it, what is probably wrong and, when
+// the portal can tell, the line as it would read once mended.
 const errorLines = (errors: RenderError[]) =>
-  "Errors:\n" + errors.map((e) => `- ${e.line ? `line ${e.line}: ` : ""}${e.message}`).join("\n");
+  "Errors:\n" +
+  errors
+    .map((e) =>
+      [
+        `- ${e.line ? `line ${e.line}: ` : ""}${e.message}`,
+        e.snippet ? `    text: ${e.snippet.trim()}` : "",
+        e.hint ? `    hint: ${e.hint}` : "",
+        e.suggestion ? `    fix:  ${e.suggestion.trim()}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    )
+    .join("\n");
 
 function errorResult(e: unknown): ToolResult {
   if (e instanceof PortalError) return fail(e.message);
@@ -50,6 +63,23 @@ async function guard(fn: () => Promise<ToolResult>): Promise<ToolResult> {
     return errorResult(e);
   }
 }
+
+// The types a diagram can be given; the portal refuses any other (its list of types the editor has tools for).
+export const CHOSEN_TYPES = [
+  "sequence", "usecase", "class", "object", "activity", "component", "deployment", "state", "timing",
+  "json", "yaml", "ebnf", "regex", "nwdiag", "salt", "archimate", "sdl", "ditaa", "gantt", "chronology",
+  "mindmap", "wbs", "math", "ie", "er", "chart", "files",
+] as const;
+
+const chosenType = z
+  .enum([...CHOSEN_TYPES, "auto"])
+  .optional()
+  .describe(
+    "The type the editor's tools follow for this diagram (Constructor actions, style presets, @start keywords). Optional: omit to leave it as it is; 'auto' clears it so the type PlantUML recognizes is used. It does not rewrite the source: write the matching @start…/@end… keywords yourself, and PlantUML still reports what it recognizes in the text.",
+  );
+
+/** 'auto' is the portal's empty choice. */
+const portalChosen = (t: string | undefined) => (t === undefined ? undefined : t === "auto" ? "" : t);
 
 export interface ToolOptions {
   /** where export_diagram may write; default: the project folder (see exportRoot) */
@@ -91,45 +121,49 @@ export function buildTools(
       inputSchema: {
         title: z.string().min(1).describe("Diagram title"),
         source: z.string().min(1).describe("PlantUML source"),
+        chosen_type: chosenType,
       },
-      handler: ({ title, source }) =>
+      handler: ({ title, source, chosen_type }) =>
         guard(async () => {
-          const d = await client.create(title, source);
+          const d = await client.create(title, source, portalChosen(chosen_type));
+          const chosen = d.chosenType ? `, chosen type: ${d.chosenType}` : "";
           return ok(
-            `Created diagram "${d.title}" (slug ${d.slug}, version ${d.version}).\nOpen in the editor: ${d.url}`,
+            `Created diagram "${d.title}" (slug ${d.slug}, version ${d.version}${chosen}).\nOpen in the editor: ${d.url}`,
           );
         }),
     },
 
     get_diagram: {
       description:
-        "Read a diagram's current source, title, type and version. Use its version as base_version when updating.",
+        "Read a diagram's current source, title, type and version. 'type' is what PlantUML recognized in the source; 'chosen type' (shown only when one is set) is what was chosen for the diagram. Use its version as base_version when updating.",
       inputSchema: { slug },
       handler: ({ slug }) =>
         guard(async () => {
           const d = await client.get(slug);
-          // the type is PlantUML's to decide: shown only when the portal has recorded one
-          const type = d.diagramType ? `type: ${d.diagramType}\n` : "";
+          // the type is PlantUML's to decide: shown only when the portal has recorded one; the chosen one only when set
+          const type = (d.diagramType ? `type: ${d.diagramType}\n` : "") + (d.chosenType ? `chosen type: ${d.chosenType}\n` : "");
           return ok(`title: ${d.title}\n${type}version: ${d.version}\nurl: ${d.url}\n\nsource:\n${d.source}`);
         }),
     },
 
     update_diagram: {
       description:
-        "Update a diagram's source (and optionally title or type). base_version is required: pass the version you last read. If the diagram changed elsewhere, you get the current version and source back to merge.",
+        "Update a diagram's source (and optionally its title or chosen type). base_version is required: pass the version you last read. If the diagram changed elsewhere, you get the current version and source back to merge.",
       inputSchema: {
         slug,
         source: z.string().min(1).describe("Full new PlantUML source"),
         base_version: z.number().int().min(1).describe("The version you based this edit on (a positive integer)"),
         title: z.string().min(1).optional(),
+        chosen_type: chosenType,
       },
-      handler: ({ slug, source, base_version, title }) =>
+      handler: ({ slug, source, base_version, title, chosen_type }) =>
         guard(async () => {
           try {
             const d = await client.update(slug, {
               source,
               baseVersion: base_version,
               title,
+              chosenType: portalChosen(chosen_type),
             });
             return ok(`Updated diagram ${d.slug} to version ${d.version}.\nOpen in the editor: ${d.url}`);
           } catch (e) {
@@ -154,7 +188,7 @@ export function buildTools(
     },
 
     list_diagrams: {
-      description: "List your diagrams (slug, title, type, version, editor link). Source is not included; use get_diagram.",
+      description: "List your diagrams (slug, title, type, chosen type when set as chosen:<type>, version, editor link). Source is not included; use get_diagram.",
       inputSchema: {},
       handler: () =>
         guard(async () => {
@@ -162,7 +196,10 @@ export function buildTools(
           if (!l.length) return ok("No diagrams yet.");
           return ok(
             l
-              .map((d) => `${d.slug}  "${d.title}"  ${d.diagramType ? d.diagramType + "  " : ""}v${d.version}  ${d.url}`)
+              .map(
+                (d) =>
+                  `${d.slug}  "${d.title}"  ${d.diagramType ? d.diagramType + "  " : ""}${d.chosenType ? "chosen:" + d.chosenType + "  " : ""}v${d.version}  ${d.url}`,
+              )
               .join("\n"),
           );
         }),

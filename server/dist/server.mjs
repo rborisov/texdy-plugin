@@ -36698,7 +36698,10 @@ function parseErrors(raw) {
   return list.map((e) => ({
     type: String(e.type ?? "error"),
     message: String(e.message ?? ""),
-    ...typeof e.line === "number" && e.line > 0 ? { line: e.line } : {}
+    ...typeof e.line === "number" && e.line > 0 ? { line: e.line } : {},
+    ...typeof e.snippet === "string" && e.snippet ? { snippet: e.snippet } : {},
+    ...typeof e.hint === "string" && e.hint ? { hint: e.hint } : {},
+    ...typeof e.suggestion === "string" && e.suggestion ? { suggestion: e.suggestion } : {}
   }));
 }
 var PortalClient = class {
@@ -36800,6 +36803,7 @@ var PortalClient = class {
       slug: slug2,
       title: String(j.title ?? ""),
       diagramType: String(j.diagram_type ?? ""),
+      chosenType: String(j.chosen_type ?? ""),
       source: String(j.source ?? ""),
       version: Number(j.version ?? 0),
       url: this.urlFor(slug2)
@@ -36841,9 +36845,15 @@ var PortalClient = class {
     if (bytes.length > MAX_EXPORT_BYTES) throw odd("it is too large");
     return { success: true, slug: slug2, version: j.version, bytes, errors };
   }
-  // No diagram type is sent, here or in update: PlantUML works out what the source is.
-  async create(title, source) {
-    const j = await this.request("POST", "/api/diagrams", { title, source });
+  // The type PlantUML recognized (diagram_type) is never sent, here or in update: it works that out from the source.
+  // chosenType is the user's choice, which the editor's tools follow; undefined leaves it as it is (none, for a new
+  // diagram), '' clears it.
+  async create(title, source, chosenType2) {
+    const j = await this.request("POST", "/api/diagrams", {
+      title,
+      source,
+      ...chosenType2 !== void 0 ? { chosen_type: chosenType2 } : {}
+    });
     return this.record(j);
   }
   async get(slug2) {
@@ -36853,7 +36863,8 @@ var PortalClient = class {
     const j = await this.request("PUT", `/api/diagrams/${encodeURIComponent(slug2)}`, {
       source: patch.source,
       base_version: patch.baseVersion,
-      ...patch.title !== void 0 ? { title: patch.title } : {}
+      ...patch.title !== void 0 ? { title: patch.title } : {},
+      ...patch.chosenType !== void 0 ? { chosen_type: patch.chosenType } : {}
     });
     return this.record(j);
   }
@@ -36864,6 +36875,7 @@ var PortalClient = class {
       slug: String(d.slug ?? ""),
       title: String(d.title ?? ""),
       diagramType: String(d.diagram_type ?? ""),
+      chosenType: String(d.chosen_type ?? ""),
       version: Number(d.version ?? 0),
       updatedAt: typeof d.updated_at === "string" ? d.updated_at : void 0,
       url: this.urlFor(String(d.slug ?? ""))
@@ -36938,7 +36950,14 @@ async function writeExport(root, requested, slug2, format, bytes) {
 var ok = (text) => ({ content: [{ type: "text", text }] });
 var fail = (text) => ({ content: [{ type: "text", text }], isError: true });
 var slug = external_exports.string().regex(/^[0-9a-f]{12}$/, "slug must be 12 lowercase hex characters (the id in the ?d=<slug> link)").describe("Diagram slug: 12 lowercase hex characters (the id in the ?d=<slug> link)");
-var errorLines = (errors) => "Errors:\n" + errors.map((e) => `- ${e.line ? `line ${e.line}: ` : ""}${e.message}`).join("\n");
+var errorLines = (errors) => "Errors:\n" + errors.map(
+  (e) => [
+    `- ${e.line ? `line ${e.line}: ` : ""}${e.message}`,
+    e.snippet ? `    text: ${e.snippet.trim()}` : "",
+    e.hint ? `    hint: ${e.hint}` : "",
+    e.suggestion ? `    fix:  ${e.suggestion.trim()}` : ""
+  ].filter(Boolean).join("\n")
+).join("\n");
 function errorResult(e) {
   if (e instanceof PortalError) return fail(e.message);
   return fail("Unexpected error in the MCP server while talking to the portal");
@@ -36950,6 +36969,39 @@ async function guard(fn) {
     return errorResult(e);
   }
 }
+var CHOSEN_TYPES = [
+  "sequence",
+  "usecase",
+  "class",
+  "object",
+  "activity",
+  "component",
+  "deployment",
+  "state",
+  "timing",
+  "json",
+  "yaml",
+  "ebnf",
+  "regex",
+  "nwdiag",
+  "salt",
+  "archimate",
+  "sdl",
+  "ditaa",
+  "gantt",
+  "chronology",
+  "mindmap",
+  "wbs",
+  "math",
+  "ie",
+  "er",
+  "chart",
+  "files"
+];
+var chosenType = external_exports.enum([...CHOSEN_TYPES, "auto"]).optional().describe(
+  "The type the editor's tools follow for this diagram (Constructor actions, style presets, @start keywords). Optional: omit to leave it as it is; 'auto' clears it so the type PlantUML recognizes is used. It does not rewrite the source: write the matching @start\u2026/@end\u2026 keywords yourself, and PlantUML still reports what it recognizes in the text."
+);
+var portalChosen = (t) => t === void 0 ? void 0 : t === "auto" ? "" : t;
 function buildTools(client, opts = {}) {
   return {
     render_diagram: {
@@ -36977,23 +37029,26 @@ function buildTools(client, opts = {}) {
       description: "Save a new diagram in the portal. Returns its slug, version and an editor link the user can open.",
       inputSchema: {
         title: external_exports.string().min(1).describe("Diagram title"),
-        source: external_exports.string().min(1).describe("PlantUML source")
+        source: external_exports.string().min(1).describe("PlantUML source"),
+        chosen_type: chosenType
       },
-      handler: ({ title, source }) => guard(async () => {
-        const d = await client.create(title, source);
+      handler: ({ title, source, chosen_type }) => guard(async () => {
+        const d = await client.create(title, source, portalChosen(chosen_type));
+        const chosen = d.chosenType ? `, chosen type: ${d.chosenType}` : "";
         return ok(
-          `Created diagram "${d.title}" (slug ${d.slug}, version ${d.version}).
+          `Created diagram "${d.title}" (slug ${d.slug}, version ${d.version}${chosen}).
 Open in the editor: ${d.url}`
         );
       })
     },
     get_diagram: {
-      description: "Read a diagram's current source, title, type and version. Use its version as base_version when updating.",
+      description: "Read a diagram's current source, title, type and version. 'type' is what PlantUML recognized in the source; 'chosen type' (shown only when one is set) is what was chosen for the diagram. Use its version as base_version when updating.",
       inputSchema: { slug },
       handler: ({ slug: slug2 }) => guard(async () => {
         const d = await client.get(slug2);
-        const type = d.diagramType ? `type: ${d.diagramType}
-` : "";
+        const type = (d.diagramType ? `type: ${d.diagramType}
+` : "") + (d.chosenType ? `chosen type: ${d.chosenType}
+` : "");
         return ok(`title: ${d.title}
 ${type}version: ${d.version}
 url: ${d.url}
@@ -37003,19 +37058,21 @@ ${d.source}`);
       })
     },
     update_diagram: {
-      description: "Update a diagram's source (and optionally title or type). base_version is required: pass the version you last read. If the diagram changed elsewhere, you get the current version and source back to merge.",
+      description: "Update a diagram's source (and optionally its title or chosen type). base_version is required: pass the version you last read. If the diagram changed elsewhere, you get the current version and source back to merge.",
       inputSchema: {
         slug,
         source: external_exports.string().min(1).describe("Full new PlantUML source"),
         base_version: external_exports.number().int().min(1).describe("The version you based this edit on (a positive integer)"),
-        title: external_exports.string().min(1).optional()
+        title: external_exports.string().min(1).optional(),
+        chosen_type: chosenType
       },
-      handler: ({ slug: slug2, source, base_version, title }) => guard(async () => {
+      handler: ({ slug: slug2, source, base_version, title, chosen_type }) => guard(async () => {
         try {
           const d = await client.update(slug2, {
             source,
             baseVersion: base_version,
-            title
+            title,
+            chosenType: portalChosen(chosen_type)
           });
           return ok(`Updated diagram ${d.slug} to version ${d.version}.
 Open in the editor: ${d.url}`);
@@ -37041,13 +37098,15 @@ ${cur.source}`;
       })
     },
     list_diagrams: {
-      description: "List your diagrams (slug, title, type, version, editor link). Source is not included; use get_diagram.",
+      description: "List your diagrams (slug, title, type, chosen type when set as chosen:<type>, version, editor link). Source is not included; use get_diagram.",
       inputSchema: {},
       handler: () => guard(async () => {
         const l = await client.list();
         if (!l.length) return ok("No diagrams yet.");
         return ok(
-          l.map((d) => `${d.slug}  "${d.title}"  ${d.diagramType ? d.diagramType + "  " : ""}v${d.version}  ${d.url}`).join("\n")
+          l.map(
+            (d) => `${d.slug}  "${d.title}"  ${d.diagramType ? d.diagramType + "  " : ""}${d.chosenType ? "chosen:" + d.chosenType + "  " : ""}v${d.version}  ${d.url}`
+          ).join("\n")
         );
       })
     },
@@ -37103,11 +37162,11 @@ var config2;
 try {
   config2 = validateConfig(process.env);
 } catch (e) {
-  process.stderr.write(`texdy MCP server: ${e.message}
+  process.stderr.write(`mimosoid MCP server: ${e.message}
 `);
   process.exit(1);
 }
-var server = new McpServer({ name: "texdy", version: "0.1.0" });
+var server = new McpServer({ name: "mimosoid", version: "0.1.0" });
 var tools = buildTools(new PortalClient(config2.baseUrl, config2.token));
 for (const [name, def] of Object.entries(tools)) {
   server.registerTool(

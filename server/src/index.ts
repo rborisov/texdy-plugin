@@ -7,11 +7,11 @@ let config: { baseUrl: string; token: string };
 try {
   config = validateConfig(process.env);
 } catch (e) {
-  process.stderr.write(`texdy MCP server: ${(e as Error).message}\n`);
+  process.stderr.write(`mimosoid MCP server: ${(e as Error).message}\n`);
   process.exit(1);
 }
 
-const server = new McpServer({ name: "texdy", version: "0.1.0" });
+const server = new McpServer({ name: "mimosoid", version: "0.1.0" });
 const tools = buildTools(new PortalClient(config.baseUrl, config.token));
 for (const [name, def] of Object.entries(tools)) {
   server.registerTool(

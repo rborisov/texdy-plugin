@@ -12,7 +12,10 @@ export class PortalError extends Error {
 export interface DiagramRecord {
   slug: string;
   title: string;
+  /** what PlantUML recognized in the source ('' = nothing recorded) */
   diagramType: string;
+  /** the type that was chosen for the diagram ('' = none: the editor's tools follow diagramType) */
+  chosenType: string;
   source: string;
   version: number;
   url: string;
@@ -22,6 +25,7 @@ export interface DiagramSummary {
   slug: string;
   title: string;
   diagramType: string;
+  chosenType: string;
   version: number;
   updatedAt?: string;
   url: string;
@@ -31,6 +35,12 @@ export interface RenderError {
   type: string;
   message: string;
   line?: number;
+  /** The text of that line. */
+  snippet?: string;
+  /** What is probably wrong. */
+  hint?: string;
+  /** The whole line as it would read once mended, when the portal can tell. */
+  suggestion?: string;
 }
 
 export interface ExportOutcome {
@@ -91,6 +101,9 @@ function parseErrors(raw: unknown): RenderError[] {
     type: String(e.type ?? "error"),
     message: String(e.message ?? ""),
     ...(typeof e.line === "number" && e.line > 0 ? { line: e.line } : {}),
+    ...(typeof e.snippet === "string" && e.snippet ? { snippet: e.snippet } : {}),
+    ...(typeof e.hint === "string" && e.hint ? { hint: e.hint } : {}),
+    ...(typeof e.suggestion === "string" && e.suggestion ? { suggestion: e.suggestion } : {}),
   }));
 }
 
@@ -216,6 +229,7 @@ export class PortalClient {
       slug,
       title: String(j.title ?? ""),
       diagramType: String(j.diagram_type ?? ""),
+      chosenType: String(j.chosen_type ?? ""),
       source: String(j.source ?? ""),
       version: Number(j.version ?? 0),
       url: this.urlFor(slug),
@@ -266,9 +280,15 @@ export class PortalClient {
     return { success: true, slug, version: j.version, bytes, errors };
   }
 
-  // No diagram type is sent, here or in update: PlantUML works out what the source is.
-  async create(title: string, source: string): Promise<DiagramRecord> {
-    const j = await this.request("POST", "/api/diagrams", { title, source });
+  // The type PlantUML recognized (diagram_type) is never sent, here or in update: it works that out from the source.
+  // chosenType is the user's choice, which the editor's tools follow; undefined leaves it as it is (none, for a new
+  // diagram), '' clears it.
+  async create(title: string, source: string, chosenType?: string): Promise<DiagramRecord> {
+    const j = await this.request("POST", "/api/diagrams", {
+      title,
+      source,
+      ...(chosenType !== undefined ? { chosen_type: chosenType } : {}),
+    });
     return this.record(j);
   }
 
@@ -278,12 +298,13 @@ export class PortalClient {
 
   async update(
     slug: string,
-    patch: { source: string; baseVersion: number; title?: string },
+    patch: { source: string; baseVersion: number; title?: string; chosenType?: string },
   ): Promise<DiagramRecord> {
     const j = await this.request("PUT", `/api/diagrams/${encodeURIComponent(slug)}`, {
       source: patch.source,
       base_version: patch.baseVersion,
       ...(patch.title !== undefined ? { title: patch.title } : {}),
+      ...(patch.chosenType !== undefined ? { chosen_type: patch.chosenType } : {}),
     });
     return this.record(j);
   }
@@ -295,6 +316,7 @@ export class PortalClient {
       slug: String(d.slug ?? ""),
       title: String(d.title ?? ""),
       diagramType: String(d.diagram_type ?? ""),
+      chosenType: String(d.chosen_type ?? ""),
       version: Number(d.version ?? 0),
       updatedAt: typeof d.updated_at === "string" ? d.updated_at : undefined,
       url: this.urlFor(String(d.slug ?? "")),

@@ -1,15 +1,15 @@
 ---
-name: texdy
-description: Use when the user asks to draw, create, change, fix or look at a UML or PlantUML diagram (sequence, class, use case, activity, component, state...), or mentions a diagram in their Texdy. Creates and edits diagrams in the portal through the texdy MCP tools and opens them in the editor.
+name: mimosoid
+description: Use when the user asks to draw, create, change, fix or look at a UML or PlantUML diagram (sequence, class, use case, activity, component, state...), or mentions a diagram in their Mimosoid. Creates and edits diagrams in the portal through the mimosoid MCP tools and opens them in the editor.
 ---
 
-# Texdy
+# Mimosoid
 
-Diagrams live in the user's Texdy. Use the `texdy` MCP tools: `render_diagram`, `create_diagram`, `get_diagram`, `update_diagram`, `list_diagrams`, `open_diagram`, `export_diagram`.
+Diagrams live in the user's Mimosoid. Use the `mimosoid` MCP tools: `render_diagram`, `create_diagram`, `get_diagram`, `update_diagram`, `list_diagrams`, `open_diagram`, `export_diagram`.
 
 ## New diagram
 
-1. Write the PlantUML source (include `@startuml` / `@enduml`, or the pair that matches the diagram, such as `@startmindmap` / `@endmindmap`). Never choose or send a diagram type: no tool takes one, and PlantUML works out what the diagram is from the source.
+1. Write the PlantUML source (include `@startuml` / `@enduml`, or the pair that matches the diagram, such as `@startmindmap` / `@endmindmap`). Never send the type PlantUML recognizes: no tool takes it, PlantUML works it out from the source. The portal also keeps the type the *user chose* for a diagram (it sets the editor's Constructor actions, style presets and `@start…` keywords). Pass `chosen_type` to `create_diagram` / `update_diagram` only when the user asks for a type to be set; `auto` clears it, leaving it out keeps it as it is. It does not rewrite the source: write the matching `@start…`/`@end…` keywords yourself.
 2. Call `render_diagram` with it. If it returns errors (with line numbers), fix the source and render again until it renders OK. Do not save a diagram that does not render.
 3. Call `create_diagram` with a short `title` and the source. It returns the slug, the version and a `url` ending in `/?d=<slug>`.
    Then call `export_diagram` with the slug: it saves `diagrams/<slug>.svg` in the project, with the diagram's source, slug and version embedded in the file, and returns only the path and the version (not the picture). Tell the user the path. Use `format: "png"` only when the user asks for a PNG.
@@ -27,7 +27,7 @@ Diagrams live in the user's Texdy. Use the `texdy` MCP tools: `render_diagram`, 
 The user may have edited it in the editor since you last saw it, so never update from memory.
 
 1. If you do not know the slug, call `list_diagrams`.
-2. Call `get_diagram` first and base your change on the source it returns.
+2. Call `get_diagram` first and base your change on the source it returns. It shows `type` (what PlantUML recognized) and, when one is set, `chosen type`. Keep the chosen type unless the user asks to change it; if the two are of different kinds (not just use case / component, or class / object), the text does not match what the user chose: tell them instead of silently changing either.
 3. Optionally `render_diagram` the new source to check it.
 4. Call `update_diagram` with the full new source and the `version` you just read as `base_version`. When it succeeds, call `export_diagram` again to refresh the file.
 5. If it fails with a conflict (409: the result carries `current_version` and the current source), the diagram changed elsewhere. Do not overwrite: merge your change into the current source (keep the user's edits) and call `update_diagram` again with the returned `current_version` as `base_version`.

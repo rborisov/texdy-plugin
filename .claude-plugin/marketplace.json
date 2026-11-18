@@ -1,12 +1,12 @@
 {
-  "name": "texdy-marketplace",
-  "description": "Claude Code plugin for Texdy",
-  "owner": { "name": "Texdy" },
+  "name": "mimosoid-marketplace",
+  "description": "Claude Code plugin for Mimosoid",
+  "owner": { "name": "Mimosoid" },
   "plugins": [
     {
-      "name": "texdy",
+      "name": "mimosoid",
       "source": "./",
-      "description": "Draw, change and open UML (PlantUML) diagrams in your Texdy from Claude Code."
+      "description": "Draw, change and open UML (PlantUML) diagrams in your Mimosoid from Claude Code."
     }
   ]
 }
