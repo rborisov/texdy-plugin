@@ -1,6 +1,6 @@
 {
   "name": "mimosoid",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Draw, change and open UML (PlantUML) diagrams in your Mimosoid from Claude Code.",
   "author": { "name": "Roman Borisov" },
   "userConfig": {

@@ -24,7 +24,10 @@ Diagrams live in the user's Mimosoid. Use the `mimosoid` MCP tools: `render_diag
 
 ## Showing the result in the chat
 
-After you create or change a diagram, and whenever the user asks to see it, call `show_diagram` with the slug. It returns the picture to you and an **image link** for the user, with the markdown to show it: `![Diagram …](https://…/i/<token>.png)`. Put that markdown in your reply. The chat does not show a tool's own image to the user, and it asks them to click "Show image" before it loads a picture from an address, so tell them to click it. The link works for about 15 minutes, for anyone who has the address (nothing is published; the picture is a snapshot of that version); if it has expired, call `show_diagram` again for a fresh one.
+After you create or change a diagram, and whenever the user asks to see it, call `show_diagram` with the slug. It returns the picture to you and an **image link** for the user, with the markdown to show it: `![Diagram …](https://…/i/<token>.png)`. The link works for about 15 minutes, for anyone who has the address (nothing is published; the picture is a snapshot of that version); if it has expired, call `show_diagram` again for a fresh one. Then show it to the user:
+
+- **In an app with a Browser pane** (the Claude desktop app): open the image link there, in a tab of its own: call `mcp__Claude_Browser__preview_start` with the link as `url`. The user sees the picture in the side panel, with no click. Never navigate a tab where the editor is open (it could lose unsaved edits); a link opened this way is a picture, not a page.
+- **Otherwise** put the markdown in your reply. The chat does not show a tool's own image to the user, and it asks them to click "Show image" before it loads a picture from an address, so tell them to click it.
 
 If `show_diagram` says no image link could be made (an older portal, or too many links), give the user the editor link, or the file `export_diagram` saved. Do not use a file-sending tool for this. For a link the user can keep or share, they publish the diagram in the editor; you do not publish for them.
 
